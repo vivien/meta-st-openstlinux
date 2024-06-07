@@ -307,6 +307,10 @@ def license_sdk_create_summary(d):
         SRC_DISTRIBUTE_LICENSES += "Xnet xpp XSkat XSL YPL-1.0 YPL-1.1 Zed Zend-2.0 Zimbra-1.3"
         SRC_DISTRIBUTE_LICENSES += "Zimbra-1.4 Zlib zlib-acknowledgement ZPL-1.1 ZPL-2.0 ZPL-2.1"
 
+        OTHER_LICENSES_NAME = "SLA0044"
+
+        OTHER_LICENSES_URL = "https://www.st.com/SLA0044"
+
         html.startDiv("OE_SPDX_LICENSE", "OE SPDX LICENSE")
         html.addAnchor("OE_SPDX_LICENSE")
 
@@ -332,6 +336,12 @@ def license_sdk_create_summary(d):
             html.startRow()
             html.addColumnContent(lic)
             html.addColumnURLOUTContent('['+lic+']', "http://git.openembedded.org/openembedded-core/tree/meta/files/common-licenses/" + lic )
+            html.stopRow()
+
+        for lic, url in zip(OTHER_LICENSES_NAME.split(' '), OTHER_LICENSES_URL.split(' ')):
+            html.startRow()
+            html.addColumnContent(lic)
+            html.addColumnURLOUTContent('['+lic+']', url )
             html.stopRow()
         html.stopTable()
 
