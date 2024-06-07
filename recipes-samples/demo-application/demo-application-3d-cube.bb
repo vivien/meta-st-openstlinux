@@ -24,22 +24,38 @@ SRC_URI = " \
     file://launch_cube_3D_video.sh \
     file://launch_cube_3D_video_shader.sh \
     file://ST153_cube_purple.png \
+    file://ST20578_Label_OpenSTlinux_V.png \
+    file://ST13028_Linux_picto_13.png \
+    file://ST4439_ST_logo.png \
     \
     file://040-3d_cube.yaml \
     file://launch_cube_3D.sh \
+    \
+    file://cube_3d.desktop \
+    file://cube_3d.png \
     "
 
 do_configure[noexec] = "1"
 do_compile[noexec] = "1"
 
 do_install() {
+    install -d ${D}${prefix}/local/demo/gtk-application/
     install -d ${D}${prefix}/local/demo/application/3d-cube/bin
     install -d ${D}${prefix}/local/demo/application/3d-cube/pictures
     install -d ${D}${prefix}/local/demo/application/3d-cube-extra/bin
     install -d ${D}${prefix}/local/demo/application/3d-cube-extra/pictures
 
+    # desktop application
+    install -d ${D}${datadir}/applications
+    install -m 0644 ${WORKDIR}/cube_3d.desktop ${D}${datadir}/applications
+
+    # picture for desktop application
+    install -d ${D}${datadir}/pixmaps
+    install -m 0644 ${WORKDIR}/cube_3d.png ${D}${datadir}/pixmaps
+
     # install yaml file
-    install -m 0644 ${WORKDIR}/*.yaml ${D}${prefix}/local/demo/application/
+    install -m 0644 ${WORKDIR}/*.yaml ${D}${prefix}/local/demo/gtk-application/
+
     # install bin
     install -m 0755 ${WORKDIR}/*.sh ${D}${prefix}/local/demo/application/3d-cube-extra/bin
     install -m 0755 ${WORKDIR}/launch_cube_3D.sh ${D}${prefix}/local/demo/application/3d-cube/bin
@@ -52,19 +68,20 @@ do_install() {
 PACKAGES += "${PN}-extra"
 FILES:${PN} = " \
     ${prefix}/local/demo/application/3d-cube \
-    ${prefix}/local/demo/application/040-3d_cube.yaml \
+    ${prefix}/local/demo/gtk-application/040-3d_cube.yaml \
+    ${datadir}/applications ${datadir}/pixmaps \
     "
 RDEPENDS:${PN} = "weston-cube demo-launcher"
 
 FILES:${PN}-extra = " \
     ${prefix}/local/demo/application/3d-cube-extra \
-    ${prefix}/local/demo/application/100-3d-cube.yaml \
-    ${prefix}/local/demo/application/101-3d-cube-shader.yaml \
-    ${prefix}/local/demo/application/105-3d-cube-picture-shader.yaml \
-    ${prefix}/local/demo/application/110-3d-cube-video.yaml \
-    ${prefix}/local/demo/application/111-3d-cube-video-shader.yaml \
-    ${prefix}/local/demo/application/115-3d_cube_camera.yaml \
-    ${prefix}/local/demo/application/116-3d_cube_camera_shader.yaml \
-    ${prefix}/local/demo/application/120-3d-cube-pictures-shader.yaml \
+    ${prefix}/local/demo/gtk-application/100-3d-cube.yaml \
+    ${prefix}/local/demo/gtk-application/101-3d-cube-shader.yaml \
+    ${prefix}/local/demo/gtk-application/105-3d-cube-picture-shader.yaml \
+    ${prefix}/local/demo/gtk-application/110-3d-cube-video.yaml \
+    ${prefix}/local/demo/gtk-application/111-3d-cube-video-shader.yaml \
+    ${prefix}/local/demo/gtk-application/115-3d_cube_camera.yaml \
+    ${prefix}/local/demo/gtk-application/116-3d_cube_camera_shader.yaml \
+    ${prefix}/local/demo/gtk-application/120-3d-cube-pictures-shader.yaml \
     "
 RDEPENDS:${PN}-extra = "${PN} weston-cube demo-launcher"

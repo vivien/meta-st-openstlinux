@@ -37,6 +37,7 @@ EXTRA_OEMAKE += 'FIRMWARE_NAME="AI_Character_Recognition.elf"'
 do_install() {
     install -d ${D}${prefix}/local/demo/bin/
     install -d ${D}${prefix}/local/demo/media/
+    install -d ${D}${prefix}/local/demo/gtk-application/
     install -d ${D}${prefix}/local/demo/application/m4_ai/bin
     install -d ${D}${prefix}/local/demo/application/m4_ai/pictures
 
@@ -45,7 +46,7 @@ do_install() {
     install -m 0644 ${B}/media/*                    ${D}${prefix}/local/demo/media/
     install -m 0755 -D ${WORKDIR}/demo/application/m4_ai/bin/* ${D}${prefix}/local/demo/application/m4_ai/bin/
     install -m 0755 -D ${WORKDIR}/demo/application/m4_ai/pictures/* ${D}${prefix}/local/demo/application/m4_ai/pictures/
-    install -m 0644 -D ${WORKDIR}/demo/application/*.yaml ${D}${prefix}/local/demo/application/
+    install -m 0644 -D ${WORKDIR}/demo/application/*.yaml ${D}${prefix}/local/demo/gtk-application/
 }
 
 FILES:${PN} += "${prefix}/local/demo/"

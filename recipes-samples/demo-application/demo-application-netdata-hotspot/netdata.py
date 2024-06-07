@@ -339,7 +339,7 @@ class NetdataWebserver(Gtk.Dialog):
                 self.info_grid.remove_row(6)
 
                 self.label_ip_wlan0.set_markup("<span font='%d' color='#FFFFFFFF'>NetData over Wifi: http://%s:19999</span>" % (self.font_size, ip_wlan0))
-                self.info_grid.attach(self.label_ip_wlan0, 0, 6, 1, 1)
+                self.info_grid.attach(self.label_ip_wlan0, 0, 6, 2, 1)
                 self.show_all()
         else:
             print ("wlan0 interface not available")
