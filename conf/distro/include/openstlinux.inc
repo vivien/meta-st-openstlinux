@@ -66,9 +66,10 @@ DISTRO_FEATURES:append = " kde "
 
 # add support of systemd
 DISTRO_FEATURES:append = " systemd "
+DISTRO_FEATURES:append = " polkit "
 
 # add support of efi
-DISTRO_FEATURES:append = " efi "
+DISTRO_FEATURES:append:aarch64 = " efi "
 
 # add support of InitRD installation package
 DISTRO_FEATURES:append = " initrd "
@@ -79,9 +80,9 @@ DISTRO_FEATURES:append = " autoresize "
 # add support of tpm2
 #DISTRO_FEATURES:append = " tpm2 "
 
-# Disabling pulseaudio
+# Disabling pulseaudio/pipewire
 #DISTRO_FEATURES_BACKFILL_CONSIDERED += "pulseaudio"
-DISTRO_FEATURES:append = "pulseaudio"
+DISTRO_FEATURES:append = "pipewire"
 
 # Disabling sysvinit
 DISTRO_FEATURES_BACKFILL_CONSIDERED += "sysvinit"
