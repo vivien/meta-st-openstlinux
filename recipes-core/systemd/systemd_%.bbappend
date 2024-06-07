@@ -2,9 +2,12 @@ PACKAGECONFIG:append = " \
     firstboot \
     coredump \
     iptc \
+    ${@bb.utils.filter('DISTRO_FEATURES', 'efi', d)} \
     "
 
 PACKAGECONFIG:append = "${@bb.utils.contains('DISTRO_FEATURES', 'polkit', '', 'polkit_hostnamed_fallback', d)} "
+
+PACKAGECONFIG:remove = "userdb"
 
 WATCHDOG_TIMEOUT = "32"
 
