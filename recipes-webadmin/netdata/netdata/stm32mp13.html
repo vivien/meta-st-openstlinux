@@ -75,7 +75,7 @@ setTimeout(function(){
 </script>
 <body>
 
-<center><H1>STM32MP1 Dashboard</H1></center>
+<center><H1>STM32MP13 Dashboard</H1></center>
 
 <div style="width: 100%; text-align: center; display: inline-block;">
 
@@ -104,16 +104,7 @@ setTimeout(function(){
                      data-points="300"
                      data-colors="#DD0000"
                      ></div>
-                <div data-netdata="cpu.cpu1"
-                     data-title="CPU1 Average"
-                     data-chart-library="gauge"
-                     data-width="20%"
-                     data-height="100%"
-                     data-after="-300"
-                     data-points="300"
-                     data-colors="#0000DD"
-                     ></div>
-                <div data-netdata="sensors.cpu_thermal_virtual_0_temperature"
+                <div data-netdata="sensors.cpu_thermal-virtual-0_temperature"
                      data-title="Temperature"
                      data-chart-library="gauge"
                      data-width="20%"
@@ -183,30 +174,10 @@ setTimeout(function(){
             ></div>
     </div>
 
-    <div style="width: 100%; height: 12vh; text-align: center; display: inline-block;">
-        <br/>
-        <div data-netdata="cpu.cpu0"
-             data-title="CPU usage of CPU0"
-             data-chart-library="dygraph"
-             data-width="49%"
-             data-height="50%"
-             data-after="-300"
-             data-dygraph-valuerange="[0, 100]"
-             ></div>
-        <div data-netdata="cpu.cpu1"
-             data-title="CPU usage of CPU1"
-             data-chart-library="dygraph"
-             data-width="49%"
-             data-height="50%"
-             data-after="-300"
-             data-dygraph-valuerange="[0, 100]"
-             ></div>
-    </div>
-
     <!-- temperature-->
     <div style="width: 100%; height: 12vh; text-align: center; display: inline-block;">
         <br/>
-        <div data-netdata="sensors.cpu_thermal_virtual_0_temperature"
+        <div data-netdata="sensors.cpu_thermal-virtual-0_temperature"
              data-title="Temperature"
              data-chart-library="dygraph"
              data-width="100%"
@@ -229,26 +200,6 @@ setTimeout(function(){
              ></div>
         <div data-netdata="system.ip"
              data-title="IP Bandwidth"
-             data-chart-library="dygraph"
-             data-width="49%"
-             data-height="50%"
-             data-after="-300"
-             data-dygraph-valuerange="[0, 100]"
-             ></div>
-    </div>
-
-    <div style="width: 100%; height: 12vh; text-align: center; display: inline-block;">
-        <br/>
-        <div data-netdata="net.end0"
-             data-title="Bandwith END0"
-             data-chart-library="dygraph"
-             data-width="49%"
-             data-height="50%"
-             data-after="-300"
-             data-dygraph-valuerange="[0, 100]"
-             ></div>
-        <div data-netdata="net.end1"
-             data-title="Bandwith END1"
              data-chart-library="dygraph"
              data-width="49%"
              data-height="50%"

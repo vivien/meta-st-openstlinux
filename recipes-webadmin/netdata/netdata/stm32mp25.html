@@ -18,8 +18,8 @@
 // Select a theme.
 // uncomment on of the two themes:
 
-//var netdataTheme = 'default'; // this is white
-var netdataTheme = 'slate'; // this is dark
+var netdataTheme = 'default'; // this is white
+//var netdataTheme = 'slate'; // this is dark
 
 
 // Set the default netdata server.
@@ -75,7 +75,7 @@ setTimeout(function(){
 </script>
 <body>
 
-<center><H1>STM32MP15 Dashboard</H1></center>
+<center><H1>STM32MP25 Dashboard</H1></center>
 
 <div style="width: 100%; text-align: center; display: inline-block;">
 
@@ -83,7 +83,6 @@ setTimeout(function(){
 
     <div style="width: 100%; height: 23vh; text-align: center; display: inline-block;">
         <div style="width: 100%; height: 100%; text-align: center; display: inline-block;">
-            <div style="width: 49%; height: 100%; align: center; display: inline-block;">
                 General
                 <br/>
                 <div data-netdata="system.cpu"
@@ -93,35 +92,65 @@ setTimeout(function(){
                      data-height="100%"
                      data-after="-300"
                      data-points="300"
-                     data-colors="#DDDD00"
+                     data-colors="#5a5"
+                     data-gauge-max-value="100"
                      ></div>
                 <div data-netdata="cpu.cpu0"
-                        data-title="CPU0 Average"
-                        data-chart-library="gauge"
-                        data-width="18%"
-                        data-height="100%"
-                        data-after="-300"
-                        data-points="300"
-                        data-colors="#DD0000"
-                        ></div>
+                     data-title="CPU0"
+                     data-chart-library="gauge"
+                     data-width="18%"
+                     data-height="100%"
+                     data-after="-300"
+                     data-points="300"
+                     data-colors="#FF5555"
+                     data-gauge-max-value="100"
+                     ></div>
                 <div data-netdata="cpu.cpu1"
-                        data-title="CPU1 Average"
+                     data-title="CPU1"
+                     data-chart-library="gauge"
+                     data-width="18%"
+                     data-height="100%"
+                     data-after="-300"
+                     data-points="300"
+                     data-colors="#4c7ff6"
+                     data-gauge-max-value="100"
+                     ></div>
+                <div data-netdata="gpu.usage"
+                     data-title="GPU"
+                     data-chart-library="gauge"
+                     data-width="18%"
+                     data-height="100%"
+                     data-after="-300"
+                     data-points="300"
+                     data-colors="#5a5"
+                     data-gauge-max-value="100"
+                     ></div>
+
+                <div style="width: 49%; height: 50%; align: center; display: inline-block;">
+                    <div data-netdata="sensors.pvt-isa-0000_temperature"
+                        data-title="Temperature"
+                        data-dimensions="temp1"
                         data-chart-library="gauge"
                         data-width="18%"
-                        data-height="100%"
+                        data-height="45%"
                         data-after="-300"
                         data-points="300"
-                        data-colors="#0000DD"
+                        data-colors="#4c7ff6"
+                        data-gauge-max-value="100"
                         ></div>
-                <div data-netdata="netdata.runtime_gpu"
-                        data-title="GPU Average"
+                    <div data-netdata="sensors.pvt-isa-0000_temperature"
+                        data-title="Temperature"
+                        data-dimensions="temp2"
                         data-chart-library="gauge"
                         data-width="18%"
-                        data-height="100%"
+                        data-height="45%"
                         data-after="-300"
                         data-points="300"
+                        data-colors="#FF5555"
+                        data-gauge-max-value="100"
                         ></div>
-                <div data-netdata="sensors.cpu_thermal-virtual-0_temperature"
+                </div>
+                <!--div data-netdata="sensors.pvt-isa-0000_temperature"
                         data-title="Temperature"
                         data-chart-library="gauge"
                         data-width="18%"
@@ -131,8 +160,8 @@ setTimeout(function(){
                         data-colors="#0000DD"
                         data-gauge-max-value="100"
                         data-gauge-stroke-color="#373B40"
-                        ></div>
-            <div style="width: 49%; height: 100%; align: center; display: inline-block;">
+                        ></div-->
+            <!--div style="width: 49%; height: 100%; align: center; display: inline-block;">
                 Network
                 <br/>
                 <div data-netdata="system.net"
@@ -174,8 +203,7 @@ setTimeout(function(){
                         data-after="-300"
                         data-points="300"
                     ></div>
-            </div>
-        </div>
+            </div-->
     </div>
     <!-- -------------------------------- -->
 
@@ -186,7 +214,7 @@ setTimeout(function(){
              data-title="CPU usage"
              data-chart-library="dygraph"
              data-width="100%"
-             data-height="50%"
+             data-height="100%"
              data-after="-300"
              data-dygraph-valuerange="[0, 100]"
             ></div>
@@ -198,7 +226,7 @@ setTimeout(function(){
              data-title="CPU usage of CPU0"
              data-chart-library="dygraph"
              data-width="49%"
-             data-height="50%"
+             data-height="100%"
              data-after="-300"
              data-dygraph-valuerange="[0, 100]"
              ></div>
@@ -206,7 +234,7 @@ setTimeout(function(){
              data-title="CPU usage of CPU1"
              data-chart-library="dygraph"
              data-width="49%"
-             data-height="50%"
+             data-height="100%"
              data-after="-300"
              data-dygraph-valuerange="[0, 100]"
              ></div>
@@ -215,29 +243,51 @@ setTimeout(function(){
     <!-- temperature-->
     <div style="width: 100%; height: 12vh; text-align: center; display: inline-block;">
         <br/>
-        <div data-netdata="sensors.cpu_thermal-virtual-0_temperature"
+        <div data-netdata="sensors.pvt-isa-0000_temperature"
              data-title="Temperature"
              data-chart-library="dygraph"
              data-width="100%"
-             data-height="50%"
+             data-height="100%"
              data-after="-300"
-             data-dygraph-valuerange="[35, 100]"
+             data-legend-position="bottom"
+             ></div>
+        <div data-netdata="gpu.usage"
+             data-title="GPU usage"
+             data-chart-library="dygraph"
+             data-width="100%"
+             data-height="100%"
+             data-after="-300"
+             ></div>
+        <div data-netdata="fps.plane"
+             data-title="Screen fps"
+             data-chart-library="dygraph"
+             data-width="100%"
+             data-height="100%"
+             data-after="-300"
              ></div>
     </div>
 
-    <!-- NET -->
+
     <div style="width: 100%; height: 12vh; text-align: center; display: inline-block;">
         <br/>
-        <div data-netdata="system.net"
-             data-title="Physical Network Interfaces Aggregated Bandwidth"
+        <div data-netdata="net.end0"
+             data-title="Bandwith END0"
              data-chart-library="dygraph"
              data-width="49%"
              data-height="50%"
              data-after="-300"
              data-dygraph-valuerange="[0, 100]"
              ></div>
-        <div data-netdata="system.ip"
-             data-title="IP Bandwidth"
+        <div data-netdata="net.end1"
+             data-title="Bandwith END1"
+             data-chart-library="dygraph"
+             data-width="49%"
+             data-height="50%"
+             data-after="-300"
+             data-dygraph-valuerange="[0, 100]"
+             ></div>
+        <div data-netdata="net.end2"
+             data-title="Bandwith END2"
              data-chart-library="dygraph"
              data-width="49%"
              data-height="50%"
