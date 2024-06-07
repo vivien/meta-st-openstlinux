@@ -1,5 +1,7 @@
 RDEPENDS:${PN} += "\
     ${@bb.utils.contains('DISTRO_FEATURES', 'wayland', 'demo-launcher', '', d)} \
+    ${@bb.utils.contains('DISTRO_FEATURES', 'wayland', 'demo-gtk', '', d)} \
+    ${@bb.utils.contains('DISTRO_FEATURES', 'wayland', 'installer-gtk', '', d)} \
     \
     ${@bb.utils.contains('DISTRO_FEATURES', 'wayland', 'demo-application-netdata-hotspot', '', d)} \
     ${@bb.utils.contains('DISTRO_FEATURES', 'wayland', 'demo-application-camera', '', d)} \
