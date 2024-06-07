@@ -2,6 +2,7 @@ FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}/:"
 
 SRC_URI:append = " \
     file://0001-allocators-Add-a-DRM-Dumb-Allocator.patch \
+    file://0002-DRAFT-video-Allow-frame-copy-from-different-dimensio.patch \
     "
 
 PACKAGECONFIG ?= " \

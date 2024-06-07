@@ -18,7 +18,6 @@ SRC_URI:append = " \
     file://0016-gstwlshmallocator-correct-WL-API-declaration.patch \
     file://0017-gtkwaylandsink-Destroy-GstWlWindow-when-par.patch \
     file://0018-GTKWAYLANDSINK-use-card0-as-default-drm-device.patch \
-    file://0019-waylandsink-Emit-map-signal-boarder-surface-is-ready.patch \
     file://0020-gtkwaylandsink-do-not-use-drm-dumb-pool-with-DMAbuf-.patch \
     file://0022-codecs-Add-base-class-for-stateless-vp8-encoder.patch \
     file://0023-v4l2codecs-Add-V4L2-VP8-stateless-encode-uAPI.patch \
@@ -28,8 +27,44 @@ SRC_URI:append = " \
     file://0027-waylandsink-HACK-disable-frame-dropping-while-redraw.patch \
     file://0028-v4l2codecs-add-key-frame-signaling.patch \
     file://0029-gtkwaylandsink-HACK-disable-frame-dropping-while-red.patch \
-    file://0030-gtkwaylandsink-cancel-pending-redraw-callback-on-pau.patch \
     file://0031-v4l2codecs-fix-support-of-unaligned-videos.patch \
+    file://0033-waylandsink-Fix-rendering-of-unaligned-content.patch \
+    file://0035-v4l2codecs-add-NV12M-format-to-gstv4l2format.patch \
+    file://0036-v4l2codecs-fix-gst_v4l2_encoder_set_src_fmt-call.patch \
+    file://0037-v4l2codecs-add-support-of-encoding-from-RGB.patch \
+    file://0038-v4l2codecs-add-colorimetry-support-at-sink-pad.patch \
+    file://0040-Revert-v4l2codecs-fix-support-of-unaligned-videos.patch \
+    file://0041-h264parser-Define-level-enum-values.patch \
+    file://0042-codecparsers-keep-naming-consistency-in-GST_H264_LEV.patch \
+    file://0043-v4l2codecs-encoder-No-need-to-set-num_planes-of-plan.patch \
+    file://0044-v4l2codecs-add-NV12M-format-to-gstv4l2format.patch \
+    file://0045-v4l2codecs-Add-V4L2-H264-stateless-encode-uAPI.patch \
+    file://0046-codecs-Add-base-class-for-stateless-h264-encoder.patch \
+    file://0047-v4l2codecs-encoder-Add-h264-code-to-v4l2-encoder-cla.patch \
+    file://0048-v4l2codecs-Add-V4L2-stateless-H264-encoder.patch \
+    file://0049-v4l2codecs-Register-V4L2-stateless-H264-encoder.patch \
+    file://0050-v4l2codecs-encoders-Implement-propose-allocation.patch \
+    file://0051-v4l2codecs-format-Allow-matching-planar-format-varia.patch \
+    file://0052-v4l2codecs-encoder-Save-the-sink-format.patch \
+    file://0053-v4l2codecs-format-Prefer-mplane-variants.patch \
+    file://0054-v4l2codecs-encoder-Implement-zero-copy-support.patch \
+    file://0055-codecs-h264enc-Fix-indentation.patch \
+    file://0056-v4l2codecs-h264enc-Fix-indentation.patch \
+    file://0057-v4l2codecs-h264enc-Cleanup-caps-colorimetry-framerat.patch \
+    file://0058-v4l2codecs-h264enc-add-CABAC-enable-disable-control.patch \
+    file://0059-v4l2codecs-h264enc-Don-t-call-virtual-negotiate-dire.patch \
+    file://0060-v4l2codecs-vp8enc-Don-t-call-virtual-negotiate-direc.patch \
+    file://0061-v4l2codecs-h264enc-Add-profile-negotiation.patch \
+    file://0062-codecs-h264encoder-Fix-H.264-QP-max-value.patch \
+    file://0063-v4l2codecs-h264dec-Remove-dead-and-broken-code.patch \
+    file://0064-codecs-Introduce-a-PID-based-rate-controller.patch \
+    file://0065-codecs-h264encoder-Use-the-PID-base-rate-controller.patch \
+    file://0066-v4l2codecs-h264enc-Rewrite-profile-level-negotiation.patch \
+    file://0067-v4l2codecs-h264enc-De-emulate-SPS-and-PPS-bitstream.patch \
+    file://0068-v4l2codecs-vp8-fix-support-of-unaligned-videos.patch \
+    file://0069-Force-to-add-math-as-library-dependency.patch \
+    file://0070-v4l2codecs-encoder-add-rotation-support.patch \
+    file://0071-v4l2codecs-Avoid-QBUF-DQBUF-struct-timeval-.tv_usec-.patch \
 "
 
 PACKAGECONFIG_GL ?= "${@bb.utils.contains('DISTRO_FEATURES', 'opengl', 'gles2 egl', '', d)}"
