@@ -6,7 +6,6 @@ Before=local-fs.target
 [Service]
 Type=oneshot
 RemainAfterExit=Yes
-StandardOutput=syslog
 TimeoutSec=0
 ExecStart=-/sbin/mount-partitions.sh start
 ExecStop=/sbin/mount-partitions.sh stop
