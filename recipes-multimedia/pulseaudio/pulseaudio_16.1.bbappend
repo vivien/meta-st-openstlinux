@@ -9,9 +9,6 @@ PACKAGECONFIG ?= "${@bb.utils.contains('DISTRO_FEATURES', 'bluetooth', 'bluez5',
 
 # Pulse audio configuration files
 SRC_URI += "file://pulse_profile.sh \
-            file://10001-deamon-conf-disable-volume-flat.patch \
-            file://10003-dbus-authorize-to-communicate-with-bluez.patch \
-            file://10004-deamon-conf-disable-exit.patch \
             "
 
 # Pulse audio configuration files installation
@@ -20,4 +17,8 @@ do_install:append() {
     install -m 0644 ${WORKDIR}/pulse_profile.sh ${D}${sysconfdir}/profile.d/
 }
 
-FILES:${PN} += "/etc/profile.d"
+PACKAGES =+ "${PN}-profile ${PN}-tools"
+FILES:${PN}-profile += "/etc/profile.d"
+FILES:${PN}-server:remove = "${bindir}/pactl"
+FILES:${PN}-tools = "${bindir}/pactl"
+RDEPENDS:pulseaudio-server += "${PN}-tools"
