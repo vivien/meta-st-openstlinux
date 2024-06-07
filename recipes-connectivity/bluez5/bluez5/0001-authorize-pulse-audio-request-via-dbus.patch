@@ -1,7 +1,7 @@
 From fd4ce2545ebf30263de41684e7b7c68e6fd1e3be Mon Sep 17 00:00:00 2001
 From: Christophe Priouzeau <christophe.priouzeau@st.com>
 Date: Fri, 14 Feb 2020 15:25:05 +0100
-Subject: [PATCH] authorize pulse audio request via dbus
+Subject: [PATCH] authorize pulse audio/pipewire request via dbus
 
 Signed-off-by: Christophe Priouzeau <christophe.priouzeau@st.com>
 ---
@@ -16,7 +16,7 @@ index 8a1e258..380388d 100644
      <allow send_interface="org.mpris.MediaPlayer2.Player"/>
    </policy>
  
-+  <policy user="pulse">
++  <policy user="weston">
 +    <allow own="org.bluez"/>
 +    <allow send_destination="org.bluez"/>
 +    <allow send_interface="org.bluez.Agent1"/>
