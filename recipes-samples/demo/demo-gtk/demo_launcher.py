@@ -21,6 +21,7 @@ from gi.repository import Pango
 
 import yaml
 
+import argparse
 import subprocess
 import random
 import math
@@ -51,6 +52,18 @@ if SIMULATE > 0:
     DEMO_PATH = "./"
 else:
     DEMO_PATH = "/usr/local/demo"
+
+
+# -------------------------------------------------------------------
+# For debug purpose
+# 0 : no message (default)
+# 1 : debug message
+# 2 : more verbose debug message
+# 3 : ultimate verbosity debug message
+LOG_LEVEL = 0
+def print_debug(level, msg):
+    if level <= LOG_LEVEL:
+        print("[DEBUG] {}".format(str(msg)))
 
 
 # -------------------------------------------------------------------
@@ -172,7 +185,7 @@ class InfoWindow(Gtk.Dialog):
         try:
             self.font_size = parent.font_size
         except:
-            print("DEBUG take default font size")
+            print_debug(1, "take default font size")
             self.font_size = 15
 
         mainvbox = self.get_content_area()
@@ -195,15 +208,15 @@ class InfoWindow(Gtk.Dialog):
 
     def on_page_press_event(self, widget, event):
         self.click_time = time()
-        print(self.click_time - self.previous_click_time)
+        print_debug(3, "{}".format(self.click_time - self.previous_click_time))
         # TODO : a fake click is observed, workaround hereafter
         if (self.click_time - self.previous_click_time) < 0.01:
             self.previous_click_time = self.click_time
         elif (self.click_time - self.previous_click_time) < 0.3:
-            print ("double click")
+            print_debug(3, "double click")
             self.destroy()
         else:
-            print ("simple click")
+            print_debug(3, "simple click")
             self.previous_click_time = self.click_time
 
 # -------------------------------------------------------------------
@@ -282,7 +295,7 @@ def _load_image_on_button(parent, filename, label_text, scale_w, scale_h):
     # Create box for xpm and label
     box = Gtk.HBox(homogeneous=False, spacing=0)
     box.set_border_width(2)
-    # print("[DEBUG] image: %s " % filename)
+    print_debug(2, "image: {}".format(filename))
     # Now on to the image stuff
     pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(
             filename=filename,
@@ -321,14 +334,14 @@ def read_configuration_board_file(search_path):
     board_list = []
     yaml_configuration = None
     board_compatibility_name = read_board_compatibility_name()
-    print("[DEBUG] compatiblity name ", read_board_compatibility_name())
+    print_debug(1, "compatiblity name {}".format(board_compatibility_name))
     configuration_found = None
     for file in sorted(os.listdir(search_path)):
         if board_compatibility_name.find(file) > -1:
             configuration_found = file
-            #print("DEBUG: found board configuration file: ", file)
+            print_debug(2, "DEBUG: found board configuration file: {}".format(file))
     if configuration_found and os.path.isfile(os.path.join(search_path, configuration_found)):
-        print("[DEBUG] read configuration box for ", configuration_found)
+        print_debug(1, "read configuration box for {}".format(configuration_found))
         with open(os.path.join(search_path, configuration_found)) as fp:
             yaml_configuration = yaml.load(fp, Loader=yaml.FullLoader)
 
@@ -358,7 +371,7 @@ def import_module_by_name(module_name):
         (corresponding to application/netdata/netdata.py file)
     '''
     try:
-        print("[DEBUG] module_name=>%s<" % module_name)
+        print_debug(2, "module_name=>{}<".format(module_name))
         imported = importlib.import_module(module_name)
     except Exception as e:
         print("Module Load, error: ", e)
@@ -376,8 +389,8 @@ class ApplicationButton():
 
         with open(yaml_file) as fp:
             self.yaml_configuration = yaml.load(fp, Loader=yaml.FullLoader)
-        #print(self.yaml_configuration)
-        #print("Name ", self.yaml_configuration["Application"]["Name"])
+        print_debug(2, "{}".format(self.yaml_configuration))
+        print_debug(2, "Name {}".format(self.yaml_configuration["Application"]["Name"]))
 
         if self.yaml_configuration:
             # check board if it's compatible
@@ -388,32 +401,35 @@ class ApplicationButton():
                                                   self.yaml_configuration["Application"]["Description"],
                                                   -1, self.icon_size, self.font_size)
                 if (self.yaml_configuration["Application"]["Type"].rstrip() == "script"):
-                    self.event_box.connect("button_release_event", self.script_handle)
+                    if "Installer" in self.yaml_configuration["Application"]:
+                        self.event_box.connect("button_release_event", self.installer_script_handle)
+                    else:
+                        self.event_box.connect("button_release_event", self.script_handle)
                     self.event_box.connect("button_press_event", self._parent.highlight_eventBox)
                 elif (self.yaml_configuration["Application"]["Type"].rstrip() == "python"):
                     self.event_box.connect("button_release_event", self.python_start)
                     self.event_box.connect("button_press_event", self._parent.highlight_eventBox)
             else:
                 self._compatible = False
-                print("     %s NOT compatible" % self.yaml_configuration["Application"]["Name"])
+                print_debug(1, "     {} NOT compatible".format(self.yaml_configuration["Application"]["Name"]))
 
 
     def is_exist(self, data):
         try:
-            #print("[DEBUG][is_exist] ", data)
+            print_debug(3, "[is_exist] {}".format(data))
             if (data):
                 for masterkey in data:
-                    #print("[DEBUG][is_exist] key available: ", masterkey)
+                    print_debug(3, "[is_exist] key available: {}".format(masterkey))
                     if masterkey == "Exist":
                         for key in data["Exist"]:
-                            #print("[DEBUG][is_exist] key detected: %s" % key)
+                            print_debug(3, "[is_exist] key detected: {}".format(key))
                             if key == "File" and len(data["Exist"]["File"].rstrip()):
                                 if (os.path.exists(data["Exist"]["File"].rstrip())):
                                     return True
                                 else:
                                     return False
                             elif (key == "Command" and len(data["Exist"]["Command"].rstrip())):
-                                retcode = subprocess.call(data["Exist"]["Command"].rstrip(), shell=True);
+                                retcode = subprocess.call(data["Exist"]["Command"].rstrip(), shell=True)
                                 if (int(retcode) == 0):
                                     return True
                                 else:
@@ -427,13 +443,13 @@ class ApplicationButton():
 
     def exist_MSG_present(self, data):
         try:
-            #print("[DEBUG][is_exist] ", data)
+            print_debug(3, "[is_exist] {}".format(data))
             if (data):
                 for masterkey in data:
-                    #print("[DEBUG][is_exist] key available: ", masterkey)
+                    print_debug(3, "[is_exist] key available: {}".format(masterkey))
                     if masterkey == "Exist":
                         for key in data["Exist"]:
-                            #print("[DEBUG][is_exist] key detected: %s" % key)
+                            print_debug(3, "[is_exist] key detected: {}".format(key))
                             if key == "Msg_false" and len(data["Exist"]["Msg_false"].rstrip()):
                                 return True
                 return False
@@ -449,18 +465,18 @@ class ApplicationButton():
             if (data):
                 for key in data:
                     if key == "List" and len(data["List"].rstrip()):
-                        #print("[DEBUG] List<", data["List"], "> %s" % board_compatibility_name, " ")
+                        print_debug(3, "List<{}> {}".format(data["List"], board_compatibility_name))
                         if data["List"].find('all') > -1:
                             return True
                         for b in data["List"].split():
-                            #print("[DEBUG] test for List <", b, "> %s" % board_compatibility_name, " " , board_compatibility_name.find(b) )
+                            print_debug(3, "test for List <{}> {} {}".format(b, board_compatibility_name, board_compatibility_name.find(b)))
                             if board_compatibility_name.find(b) > -1:
                                 return True
                         return False
                     elif key == "NotList" and len(data["NotList"].rstrip()):
-                        #print("[DEBUG] NotList<", data["NotList"], "> %s" % board_compatibility_name, "  "))
+                        print_debug(3, "NotList<{}> {}".format(data["NotList"],board_compatibility_name))
                         for b in data["NotList"].split():
-                            #print("[DEBUG] test for Not List <", b, "> %s" % board_compatibility_name, " " , board_compatibility_name.find(b) )
+                            print_debug(3, "test for Not List <{}> {} {}".format(b, board_compatibility_name, board_compatibility_name.find(b)))
                             if board_compatibility_name.find(b) > -1:
                                 return False
                         return True
@@ -475,19 +491,19 @@ class ApplicationButton():
         return self.event_box
 
     def python_start(self, widget, event):
-        print("Python module =>", self.yaml_configuration["Application"]["Python"]["Module"], "<<<")
+        print_debug(2, "Python module => {}<<<".format(self.yaml_configuration["Application"]["Python"]["Module"]))
         if (self.is_exist(self.yaml_configuration["Application"]["Python"])):
             if (self.yaml_configuration["Application"]["Python"]["Module"] and
                 len(self.yaml_configuration["Application"]["Python"]["Module"].rstrip()) > 0):
                 module_imported = import_module_by_name(self.yaml_configuration["Application"]["Python"]["Module"].rstrip())
                 if (module_imported):
-                    print("[Python_event start]")
+                    print_debug(3, "[Python_event start]")
                     module_imported.create_subdialogwindow(self._parent)
-                    print("[Python_event stop]\n")
+                    print_debug(3, "[Python_event stop]\n")
                     widget.set_name("transparent_bg")
                     self._parent.button_exit.show()
         elif (self.exist_MSG_present(self.yaml_configuration["Application"]["Python"])):
-            print("[WARNING] %s not detected\n" % self.yaml_configuration["Application"]["Python"]["Exist"]["Msg_false"])
+            print("[WARNING] {} not detected\n".format(self.yaml_configuration["Application"]["Python"]["Exist"]["Msg_false"]))
             self._parent.display_message("<span font='15' color='#FFFFFFFF'>%s\n</span>" % self.yaml_configuration["Application"]["Python"]["Exist"]["Msg_false"])
         widget.set_name("transparent_bg")
         self._parent.button_exit.show()
@@ -495,30 +511,68 @@ class ApplicationButton():
     def script_start(self):
         global lock
         with lock:
-            print("Lock Acquired")
+            print_debug(2, "Lock Acquired")
             backscript_window = BackVideoWindow(self._parent)
             backscript_window.show_all()
 
-            print("[DEBUG][ApplicationButton][script_handle]:")
-            print("    Name: ", self.yaml_configuration["Application"]["Name"])
-            print("    Start script: ", self.yaml_configuration["Application"]["Script"]["Start"])
+            print_debug(3, "[ApplicationButton][script_handle]:")
+            print_debug(3, "    Name: {}".format(self.yaml_configuration["Application"]["Name"]))
+            print_debug(3, "    Start script: {}".format(self.yaml_configuration["Application"]["Script"]["Start"]))
 
             cmd = [os.path.join(DEMO_PATH,self.yaml_configuration["Application"]["Script"]["Start"])]
             subprocess.run(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
             backscript_window.destroy()
-            print("Lock Released")
+            print_debug(2, "Lock Released")
 
     def script_handle(self, widget, event):
         if (self.is_exist(self.yaml_configuration["Application"]["Script"])):
-            print("Acquiring lock")
+            print_debug(2, "Acquiring lock")
+            print_debug(3, "[script_event start]\n")
             self.script_start()
 
         elif (self.exist_MSG_present(self.yaml_configuration["Application"]["Script"])):
             print("[WARNING] %s not detected\n" % self.yaml_configuration["Application"]["Script"]["Exist"]["Msg_false"])
             self._parent.display_message("<span font='15' color='#FFFFFFFF'>%s\n</span>" % self.yaml_configuration["Application"]["Script"]["Exist"]["Msg_false"])
 
-        print("[script_event stop]\n")
+        print_debug(3, "[script_event stop]\n")
         widget.set_name("transparent_bg")
+        self._parent.button_exit.show()
+
+    def installer_script_handle(self, widget, event):
+        install_type = self.yaml_configuration["Application"]["Installer"]["Type"].rstrip()
+        if install_type == "installer" or install_type == "uninstaller" or install_type == "demo":
+            # show a popup windows while the installation/uninstallation process is on-going
+            self._parent.display_message("<span font='15' color='#FFFFFFFF'>{}\n{}</span>".format("IMPORTANT MESSAGE", "The packages installation or uninstallation may take some time.\nOnce you have clicked on the 'OK' button and its color has changed from white to gray, be patient and wait for this dialog box to close when the process is complete."))
+
+        # turn the cursor into a watch when installing packages
+        self._parent.get_window().set_cursor(Gdk.Cursor(Gdk.CursorType.WATCH))
+
+        if (self.is_exist(self.yaml_configuration["Application"]["Script"])):
+            print_debug(2, "Acquiring lock")
+            print_debug(3, "[installer_script_event start]\n")
+            self.script_start()
+        elif (self.exist_MSG_present(self.yaml_configuration["Application"]["Script"])):
+            print("[WARNING] %s not detected\n" % self.yaml_configuration["Application"]["Script"]["Exist"]["Msg_false"])
+            self._parent.display_message("<span font='15' color='#FFFFFFFF'>%s\n</span>" % self.yaml_configuration["Application"]["Script"]["Exist"]["Msg_false"])
+
+        print_debug(3, "[installer_script_event stop]\n")
+        widget.set_name("transparent_bg")
+
+        if install_type == "installer":
+            # X-Linux package installer: we redraw the tiles with the X-Linux demo installers
+            self._parent.remove(self._parent._overlay)
+            self._parent.create_page_icon_autodetected(self._parent.install_path)
+        elif install_type == "uninstaller":
+            # X-Linux package uninstaller: we redraw the tiles with the X-Linux demo uninstallers
+            self._parent.remove(self._parent._overlay)
+            self._parent.create_page_icon_autodetected(self._parent.uninstall_path)
+        else:
+            # X-Linux demo installer: we redraw the tiles with the demos
+            self._parent.remove(self._parent._overlay)
+            self._parent.create_page_icon_autodetected(self._parent.application_path)
+
+        # restore the cursor after installing packages
+        self._parent.get_window().set_cursor(None)
         self._parent.button_exit.show()
 
 
@@ -573,26 +627,44 @@ class MainUIWindow(Gtk.Window):
             #self.fullscreen()
             self.maximize()
             try:
+                print_debug(3, "get default screen size")
                 display = Gdk.Display.get_default()
                 monitor = display.get_primary_monitor()
-                geometry = monitor.get_geometry()
-                scale_factor = monitor.get_scale_factor()
-                self.screen_width = scale_factor * geometry.width
-                self.screen_height = scale_factor * geometry.height
+                if monitor:
+                    print_debug(3, "  get geometry from primary monitor")
+                    geometry = monitor.get_geometry()
+                    scale_factor = monitor.get_scale_factor()
+                    self.screen_width = scale_factor * geometry.width
+                    self.screen_height = scale_factor * geometry.height
+                else:
+                    print_debug(3, "  get geometry from monitors (primary monitor not set)")
+                    monitor_geometries = [
+                        display.get_monitor(i).get_geometry()
+                        for i in range(display.get_n_monitors())
+                    ]
+                    x0 = min(mg.x             for mg in monitor_geometries)
+                    y0 = min(mg.y             for mg in monitor_geometries)
+                    x1 = max(mg.x + mg.width  for mg in monitor_geometries)
+                    y1 = max(mg.y + mg.height for mg in monitor_geometries)
+                    self.screen_width  = x1 - x0
+                    self.screen_height = y1 - y0
             except:
+                # deprecated Gtk functions
                 self.screen_width = self.get_screen().get_width()
                 self.screen_height = self.get_screen().get_height()
 
         self.board_name = "STM32MP board"
 
         self.set_default_size(self.screen_width, self.screen_height)
-        print("[DEBUG] screen size: %dx%d" % (self.screen_width, self.screen_height))
+        print_debug(2, "screen size: %dx%d" % (self.screen_width, self.screen_height))
         self.set_position(Gtk.WindowPosition.CENTER)
         self.connect('destroy', detroy_quit_application)
 
         self.previous_click_time=time()
 
-        self.application_path = os.path.join(DEMO_PATH,"./application/")
+        self.application_path = os.path.join(DEMO_PATH,"./gtk-application/")
+        self.install_path = os.path.join(DEMO_PATH,"./gtk-installer/install")
+        self.uninstall_path = os.path.join(DEMO_PATH,"./gtk-installer/uninstall")
         self.board_path = os.path.join(DEMO_PATH,"./board/")
 
         self.board_configuration = read_configuration_board_file(self.board_path)
@@ -606,10 +678,10 @@ class MainUIWindow(Gtk.Window):
         self.row_spacing = sizes[SIZES_ID_ROW_SPACING]
 
         # page for basic information
-        self.create_page_icon_autodetected()
+        self.create_page_icon_autodetected(self.application_path)
 
     def display_message(self, message):
-        dialog = Gtk.Dialog("Error", self, 0, (Gtk.STOCK_OK, Gtk.ResponseType.OK))
+        dialog = Gtk.Dialog(title="Error", transient_for=self, flags=0)
         dialog.set_decorated(False)
         width, height = self.get_size()
         dialog.set_default_size(width, height)
@@ -625,30 +697,34 @@ class MainUIWindow(Gtk.Window):
         label2 = Gtk.Label() #for padding
 
         # Create a centering alignment object
-        align = Gtk.Alignment()
-        align.set(0.5, 0, 0, 0)
+        ok_button = Gtk.Button.new_with_label("OK")
+        ok_button.connect("clicked", lambda x: dialog.response(Gtk.ResponseType.OK))
+        ok_button.set_halign(Gtk.Align.CENTER)
+        ok_button.set_valign(Gtk.Align.END)
 
-        dialog.vbox.pack_start(label0, True, False, 0)
-        dialog.vbox.pack_start(label1, True, True,  0)
-        dialog.vbox.pack_start(align,  True, True,  0)
-        dialog.vbox.pack_start(label2, True, False, 0)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        box.pack_start(label0, True, False, 0)
+        box.pack_start(label1, True, True, 0)
+        box.pack_start(label2, True, False, 0)
+        box.pack_end(ok_button, False, False, 0)
 
-        dialog.action_area.reparent(align)
+        dialog.get_content_area().add(box)
+
         dialog.show_all()
 
         dialog.run()
-        print("INFO dialog closed")
+        print_debug(1, "INFO dialog closed")
 
         dialog.destroy()
 
 
     def info_event(self, widget, event):
-        print("[info_event start]");
+        print_debug(2, "[info_event start]")
         info_window = InfoWindow(self)
         info_window.show_all()
         response = info_window.run()
         info_window.destroy()
-        print("[info_event stop]\n");
+        print_debug(2, "[info_event stop]\n")
         widget.set_name("transparent_bg")
         self.button_exit.show()
 
@@ -656,12 +732,12 @@ class MainUIWindow(Gtk.Window):
     # Button event of main screen
     def highlight_eventBox(self, widget, event):
         ''' highlight the eventBox widget '''
-        print("[highlight_eventBox start]")
+        print_debug(3, "[highlight_eventBox start]")
         widget.set_name("highlight_bg")
         self.button_exit.hide()
-        print("[highlight_eventBox stop]\n")
+        print_debug(3, "[highlight_eventBox stop]\n")
 
-    def create_page_icon_autodetected(self):
+    def create_page_icon_autodetected(self, application_path):
         self.yaml_application_list = None
         self.application_list = []
         self.application_eventbox_list = []
@@ -688,15 +764,15 @@ class MainUIWindow(Gtk.Window):
         self.next_box = self.create_eventbox_back_next(0)
 
         number_of_application = 0
-        for file in sorted(os.listdir(self.application_path)):
-            if os.path.isfile(os.path.join(self.application_path, file)) and file.endswith(".yaml"):
-                print("[DEBUG] create event box for ", file)
-                application_button = ApplicationButton(self, os.path.join(self.application_path, file), self.icon_size, self.font_size)
+        for file in sorted(os.listdir(application_path)):
+            if os.path.isfile(os.path.join(application_path, file)) and file.endswith(".yaml"):
+                print_debug(1, "create event box for {}".format(file))
+                application_button = ApplicationButton(self, os.path.join(application_path, file), self.icon_size, self.font_size)
                 if application_button.is_compatible():
-                    self.application_list.append(os.path.join(self.application_path, file))
+                    self.application_list.append(os.path.join(application_path, file))
                     self.application_eventbox_list.append(application_button.get_event_box())
                 number_of_application = number_of_application + 1
-        print("[DEBUG] there is %d application(s) detected " % number_of_application)
+        print_debug(1, "there is {} application(s) detected".format(number_of_application))
         if number_of_application == 0:
             self.set_default_size(self.screen_width, self.screen_height)
             self.display_message("<span font='15' color='#FFFFFFFF'>There is no application detected\n</span>")
@@ -704,11 +780,12 @@ class MainUIWindow(Gtk.Window):
 
         self.application_end = len(self.application_list)
 
-        #print("[DEBUG] application list:\n", self.application_list)
+        print_debug(3, "application list:\n{}".format(self.application_list))
         self.create_page_icon_by_page(0)
         self.page_main.add(self.icon_grid)
 
         overlay = Gtk.Overlay()
+        self._overlay = overlay
         overlay.add(self.page_main)
         self.button_exit = Gtk.Button()
         self.button_exit.connect("clicked", detroy_quit_application)
@@ -736,7 +813,7 @@ class MainUIWindow(Gtk.Window):
         self.icon_grid.remove(self.back_box)
         self.icon_grid.remove(self.next_box)
 
-        #print("[ICON DEBUG] app_start ", app_start)
+        print_debug(3, "[ICON DEBUG] app_start {}".format(app_start))
         # calculate next and previous
         if app_start > 0:
             if (app_start % 5) == 0:
@@ -749,8 +826,8 @@ class MainUIWindow(Gtk.Window):
         else:
             self.application_start_previous = 0
             self.application_start_next = 5
-        #print("[ICON DEBUG] previous ", self.application_start_previous)
-        #print("[ICON DEBUG] next ", self.application_start_next)
+        print_debug(3, "[ICON DEBUG] previous {}".format(self.application_start_previous))
+        print_debug(3, "[ICON DEBUG] next {}".format(self.application_start_next))
 
         if app_start != 0:
             ''' add previous button '''
@@ -851,6 +928,11 @@ if __name__ == "__main__":
     if file_is_locked(lock_file_path):
         print("[ERROR] another instance is running exiting now\n")
         exit(0)
+    # Parse argument if any
+    parser = argparse.ArgumentParser(description='OpenSTLinux Demonstration Launcher')
+    parser.add_argument("-l", "--log_level", type=int, action="store", default=0, help="Message log level")
+    args = parser.parse_args()
+    LOG_LEVEL = args.log_level
     try:
         win = MainUIWindow()
         win.connect("delete-event", Gtk.main_quit)

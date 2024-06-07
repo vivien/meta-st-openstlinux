@@ -7,9 +7,9 @@ Summary:
 
 1. Purpose:
 -----------
-Propose a generic way to descibe an application and easily add it on the
+Propose a generic way to describe an application and easily add it on the
 demo_launcher.
-To permit a better and dynamic management of application, each application are
+To permit a better and dynamic management of application, each application is
 described on a yaml file.
 
 2. Yaml description for each application:
@@ -35,46 +35,60 @@ Application:
     Action:
         button_release_event: <python_start|script_management>
         button_press_event: highlight_eventBox
+    Installer:
+        Type: <installer|uninstaller|launcher|demo>
 
-Explaination:
+Explanation:
 - Name: name of application displayed on demo_launcher
 - Description: description of application displayed on demo_launcher
 - Icon: icon of application displayed on demo_launcher
-- Board: define which board the application are compatible
-    List: list of chip/soc the application are compatible
-    NotList: List of chip/soc the application are NOT compatible
+- Board: define which boards the application is compatible with
+    List: list of chip/soc the application is compatible with
+    NotList: List of chip/soc the application is NOT compatible with
 - Type: Type of script to launch the application,
         type available:
             * "script": shell script or application (without parameters) to execute
-            * "python": python script to load for launching application
-        This two type have a specific declaration available: Script, Python
-- Script: it'a s section for describe the script (shell or application) to
+            * "python": Python script to load for launching application
+        These two types have a specific declaration available: Script, Python
+- Script: This section is for describing the script (shell or application) to
   launch the application.
-  This section have several sub section:
-    Exist: verify some requirement before to launch start command
+  This section has several sub-sections:
+    Exist: verify some requirements before launching the start command
     Start: command to start the application
 
     Exist section:
         File: <verify presence of specific file>
-        Command: <command to execute, if return are Ok then we can launch start command>
+        Command: <command to execute, if return is Ok then we can launch start command>
 
-- Python: it'a s section for describe the python script to load for accessing
-  to application functionality. The python script must have the function
-  "create_subdialogwindow(<parent window>)"
-  This section have several sub section:
-    Exist: verify some requirement before to launch start command
-    Module: Python module name to load, it's corresponding to path and scirpt
+- Python: This section is for describing the Python script that needs to be
+  loaded in order to access the functionalities of the application. The Python
+  script must have the function "create_subdialogwindow(<parent window>)"
+  This section has several sub-sections:
+    Exist: verify some requirements before launching the start command
+    Module: Python module name to load, it's corresponding to path and script
     name.
        ex.:
             path = application/netdata/netdata.py
             module name = application.netdata.netdata
-        Tips: you need to add an empty file name "__init__.py" on each sub
-        directory to permit to launch the python module
+        Tips: You need to add an empty file named '__init.py__' to each
+              subdirectory in order to allow the launch of the Python module
 
     Exist section:
         File: <verify presence of specific file>
         Command: <command to execute, if return are Ok then we can launch start command>
 
+- Installer: This section is used to install new applications in the
+  demo_launcher through dedicated installers.
+  This section has one sub-section:
+    Type: Type of installation:
+             * 'installer: This value shifts the demo launcher to the installer
+                           mode.
+             * 'uninstaller: This value shifts the demo launcher to the
+                             uninstaller mode.
+             * 'launcher': This value shifts the demo installer or uninstaller
+                           to the launcher mode.
+             * 'demo': This value shows the application is an installer or a
+                       uninstaller.
 
 3. File Tree:
 ------------
@@ -121,8 +135,12 @@ application/
     │   └── launch_video.sh
     └── pictures
         └── Video_playback_logo.pn
+
+Application installers are stored in the directory 'installer' with the same
+structure than the directory 'application'.
+
 4. Example of application:
------------------------
+--------------------------
 Example 1:
 Application:
     Name: 3D Pict
