@@ -3,22 +3,6 @@ function print_debug() {
     echo "[exec]: $@"
 }
 
-function pty_exec() {
-    cmd=$1
-    pty=$(tty > /dev/null 2>&1; echo $?)
-    if [ $pty -eq 0 ]; then
-        cmd=$(echo $cmd | sed "s#\"#'#g")
-        event_cmd=$(echo /usr/local/demo/bin/touch-event-gtk-player -w $SCREEN_WIDTH -h $SCREEN_HEIGHT --graph \"$cmd\")
-        eval $event_cmd > /dev/null 2>&1
-    else
-        # no pty
-        echo "NO PTY"
-        event_cmd=$(echo /usr/local/demo/bin/touch-event-gtk-player -w $SCREEN_WIDTH -h $SCREEN_HEIGHT --graph \'$cmd\')
-        script -qc "$event_cmd" > /dev/null 2>&1
-    fi
-}
-
-
 is_dcmipp_present() {
     DCMIPP_SENSOR="NOTFOUND"
     # on disco board ov5640 camera can be present on csi connector
@@ -37,8 +21,6 @@ is_dcmipp_present() {
                     sensorsubdev=$(tr -d '\0' < $sub/name)
                     #bridge is connected to output of sensor (":0 [ENABLED" with media-ctl -p)
                     bridgesubdev=$(media-ctl -d $mediadev -p -e "$sensorsubdev" | grep ":0 \[ENABLED" | awk -F\" '{print $2}')
-                    #interface is connected to input of postproc (":1 [ENABLED" with media-ctl -p)
-                    interfacesubdev=$(media-ctl -d $mediadev -p -e "dcmipp_dump_postproc" | grep ":1 \[ENABLED" | awk -F\" '{print $2}')
                     if [ "$subdev_name" = "gc2145" ]; then
                         sensorbuscode_constrain="BE"
                         parallelbuscode="RGB565_2X8_BE"
@@ -50,7 +32,6 @@ is_dcmipp_present() {
                     echo "video device: "$V4L_DEVICE
                     echo "sensor    subdev: " $sensorsubdev
                     echo "bridge    subdev: " $bridgesubdev
-                    echo "interface subdev: " $interfacesubdev
 
                     return
                 fi
@@ -120,8 +101,8 @@ if [ "$DCMIPP_SENSOR" != "NOTFOUND" ]; then
     media-ctl -d $mediadev --set-v4l2 "'$sensorsubdev':0[fmt:$sensorbuscode/${WIDTH}x${HEIGHT}@1/${FPS} field:none]"
     print_debug media-ctl -d $mediadev --set-v4l2 "'$bridgesubdev':2[fmt:$sensorbuscode/${WIDTH}x${HEIGHT}]"
     media-ctl -d $mediadev --set-v4l2 "'$bridgesubdev':2[fmt:$sensorbuscode/${WIDTH}x${HEIGHT}]"
-    print_debug media-ctl -d $mediadev --set-v4l2 "'$interfacesubdev':1[fmt:$parallelbuscode/${WIDTH}x${HEIGHT}]"
-    media-ctl -d $mediadev --set-v4l2 "'$interfacesubdev':1[fmt:$parallelbuscode/${WIDTH}x${HEIGHT}]"
+    print_debug media-ctl -d $mediadev --set-v4l2 "'dcmipp_input':1[fmt:$parallelbuscode/${WIDTH}x${HEIGHT}]"
+    media-ctl -d $mediadev --set-v4l2 "'dcmipp_input':1[fmt:$parallelbuscode/${WIDTH}x${HEIGHT}]"
     print_debug media-ctl -d $mediadev --set-v4l2 "'dcmipp_dump_postproc':1[fmt:$parallelbuscode/${WIDTH}x${HEIGHT}]"
     media-ctl -d $mediadev --set-v4l2 "'dcmipp_dump_postproc':1[fmt:$parallelbuscode/${WIDTH}x${HEIGHT}]"
     V4L2_CAPS="video/x-raw, format=RGB16, width=$WIDTH, height=$HEIGHT"
@@ -152,10 +133,3 @@ else
     V4L_OPT="io-mode=4"
     v4l2-ctl --set-parm=30
 fi
-
-
-echo "Gstreamer graph:"
-GRAPH="v4l2src $V4L_DEVICE $V4L_OPT ! $V4L2_CAPS ! queue ! $ADDONS gtkwaylandsink name=gtkwsink"
-
-echo "  $GRAPH"
-pty_exec "$GRAPH"
