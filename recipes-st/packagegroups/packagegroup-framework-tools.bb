@@ -83,14 +83,13 @@ RDEPENDS:packagegroup-framework-tools-network = "\
 
 SUMMARY:packagegroup-framework-tools-audio = "Framework tools components for audio"
 RDEPENDS:packagegroup-framework-tools-audio = "\
-    ${@bb.utils.contains('DISTRO_FEATURES', 'pulseaudio', 'pulseaudio', '', d)}                     \
-    ${@bb.utils.contains('DISTRO_FEATURES', 'pulseaudio', 'pulseaudio-server', '', d)}              \
-    ${@bb.utils.contains('DISTRO_FEATURES', 'pulseaudio', 'pulseaudio-misc', '', d)}                \
-    ${@bb.utils.contains('DISTRO_FEATURES', 'pulseaudio', 'pulseaudio-module-combine-sink', '', d)} \
-    ${@bb.utils.contains('DISTRO_FEATURES', 'pulseaudio bluetooth', 'pulseaudio-module-bluetooth-discover', '', d)} \
-    ${@bb.utils.contains('DISTRO_FEATURES', 'pulseaudio bluetooth', 'pulseaudio-module-bluetooth-policy', '', d)}   \
-    ${@bb.utils.contains('DISTRO_FEATURES', 'pulseaudio bluetooth', 'pulseaudio-module-bluez5-device', '', d)}      \
-    ${@bb.utils.contains('DISTRO_FEATURES', 'pulseaudio bluetooth', 'pulseaudio-module-bluez5-discover', '', d)}    \
+    ${@bb.utils.contains('DISTRO_FEATURES', 'pipewire', 'pipewire', '', d)}                     \
+    ${@bb.utils.contains('DISTRO_FEATURES', 'pipewire', 'pulseaudio-tools', '', d)}             \
+    ${@bb.utils.contains('DISTRO_FEATURES', 'pipewire', 'pipewire-tools', '', d)}               \
+    ${@bb.utils.contains('DISTRO_FEATURES', 'pipewire', 'wireplumber', '', d)}                  \
+    ${@bb.utils.contains('DISTRO_FEATURES', 'pipewire', 'pulseaudio-tools pipewire-spa-tools', '', d)}             \
+    ${@bb.utils.contains('DISTRO_FEATURES', 'pipewire', 'libcamera', '', d)}                    \
+    ${@bb.utils.contains('DISTRO_FEATURES', 'pipewire', 'libcamera-gst', '', d)}                \
     "
 
 SUMMARY:packagegroup-framework-tools-ui = "Framework tools components for ui"
