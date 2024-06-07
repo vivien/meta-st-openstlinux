@@ -8,7 +8,7 @@ PACKAGE_ARCH = "${MACHINE_ARCH}"
 PV = "1.1"
 
 do_install() {
-	if [ "${TARGET_ARCH}" = "arm" ]; then
+	if [ "${TARGET_ARCH}" = "arm" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
 		mkdir -p ${D}${sysconfdir}/st-info.d
 		touch ${D}${sysconfdir}/st-info.d/graphics-${PV}
 		printf "LIBGLES1=${PREFERRED_PROVIDER_virtual/libgles1}\n" > ${D}${sysconfdir}/st-info.d/graphics-${PV}
