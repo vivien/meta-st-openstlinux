@@ -22,12 +22,9 @@ POKY_NON_REMOVABLE  = "${OEROOT}/layers/poky/meta"
 #
 BASELAYERS ?= " \
     ${OEROOT}/layers/meta-openembedded/meta-gnome \
-    ${OEROOT}/layers/meta-openembedded/meta-initramfs \
     ${OEROOT}/layers/meta-openembedded/meta-multimedia \
     ${OEROOT}/layers/meta-openembedded/meta-networking \
     ${OEROOT}/layers/meta-openembedded/meta-webserver \
-    ${OEROOT}/layers/meta-openembedded/meta-filesystems \
-    ${OEROOT}/layers/meta-openembedded/meta-perl \
 "
 
 BBLAYERS_NON_REMOVABLE ?= " \
@@ -45,12 +42,11 @@ ADDONSLAYERS += "${@'${OEROOT}/layers/meta-linaro/meta-linaro' if os.path.isfile
 ADDONSLAYERS += "${@'${OEROOT}/layers/meta-linaro/meta-linaro-toolchain' if os.path.isfile('${OEROOT}/layers/meta-linaro/meta-linaro-toolchain/conf/layer.conf') else ''}"
 ADDONSLAYERS += "${@'${OEROOT}/layers/meta-openembedded/meta-networking' if os.path.isfile('${OEROOT}/layers/meta-linaro/meta-linaro/conf/layer.conf') else ''}"
 
-# Qt5
-ADDONSLAYERS += "${@'${OEROOT}/layers/meta-qt5' if os.path.isfile('${OEROOT}/layers/meta-qt5/conf/layer.conf') else ''}"
-
 # Security layer
 ADDONSLAYERS += " \
     ${@'${OEROOT}/layers/meta-security \
+    ${OEROOT}/layers/meta-openembedded/meta-filesystems \
+    ${OEROOT}/layers/meta-openembedded/meta-perl \
     ${OEROOT}/layers/meta-security/meta-tpm' \
     if os.path.isfile('${OEROOT}/layers/meta-security/conf/layer.conf') else ''} \
     "
