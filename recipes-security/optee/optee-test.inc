@@ -9,7 +9,7 @@ inherit python3native cmake
 
 OPTEE_CLIENT_EXPORT = "${STAGING_DIR_HOST}${prefix}"
 TEEC_EXPORT         = "${STAGING_DIR_HOST}${prefix}"
-TA_DEV_KIT_DIR      = "${STAGING_INCDIR}/optee/export-user_ta"
+TA_DEV_KIT_DIR      = "${STAGING_INCDIR}/optee/${@bb.utils.contains('TUNE_FEATURES', 'aarch64', 'export-user_ta_arm64', 'export-user_ta', d)}"
 TEE_PLUGIN_LOAD_PATH = "${libdir}/tee-supplicant/plugins"
 
 EXTRA_OEMAKE = " TA_DEV_KIT_DIR=${TA_DEV_KIT_DIR} \

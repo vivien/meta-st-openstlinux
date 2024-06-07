@@ -13,6 +13,7 @@ SRC_URI += "file://0003-regression-1013-lower-number-of-loops-when-pager-is-.pat
 SRC_URI += "file://0004-ta-crypt-remove-CFG_SYSTEM_PTA-ifdef.patch"
 SRC_URI += "file://0005-regression-4012-4016-remove-CFG_SYSTEM_PTA-dependenc.patch"
 SRC_URI += "file://0006-xtest-remove-CFG_SECSTOR_TA_MGMT_PTA-dependency.patch"
+SRC_URI += "file://0007-xtest-pkcs11_1014-fix-CKA_VALUE_LEN-type.patch"
 
 PV = "3.19.0+git${SRCPV}"
 
