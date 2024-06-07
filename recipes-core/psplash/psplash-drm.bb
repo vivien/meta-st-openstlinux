@@ -11,9 +11,10 @@ SRC_URI = " \
         file://basic_splash_drm.c \
         file://Makefile \
         file://psplash-drm-quit \
+        file://pictures \
     "
 
-SRC_URI += " file://psplash-drm-start.service "
+SRC_URI += " file://psplash-drm-start.service file://psplash-drm-start.sh file://71-dev-dri-card0.rules"
 
 PROVIDES = "virtual/psplash"
 RPROVIDES:${PN} = "virtual-psplash virtual-psplash-support"
@@ -40,8 +41,12 @@ do_install() {
     install -m 755 ${WORKDIR}/psplash-drm-quit ${D}${bindir}
 
     if ${@bb.utils.contains('DISTRO_FEATURES','systemd','true','false',d)}; then
-        install -d ${D}${systemd_unitdir}/system
+        install -d ${D}${systemd_unitdir}/system ${D}${datadir}/splashscreen ${D}${sysconfdir}/udev/rules.d/
         install -m 644 ${WORKDIR}/*.service ${D}/${systemd_unitdir}/system
+        install -m 755 ${WORKDIR}/psplash-drm-start.sh ${D}/${bindir}
+        install -m 644 ${WORKDIR}/pictures/* ${D}${datadir}/splashscreen/
+        install -m 644 ${WORKDIR}/71-dev-dri-card0.rules ${D}${sysconfdir}/udev/rules.d/
+
     fi
 }
-FILES:${PN} += "${systemd_unitdir}/system "
+FILES:${PN} += "${systemd_unitdir}/system ${datadir}"

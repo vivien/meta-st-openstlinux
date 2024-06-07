@@ -38,7 +38,9 @@
 static int drm_fd;
 static int pipe_fd;
 static int wait = 0;
-
+static int display_max_size = MAX_HEIGHT_THRESHOLD;
+static int force_hdmi = 0;
+static int force_no_hdmi = 0;
 //----------------------
 // Prototype
 struct modeset_dev;
@@ -130,6 +132,20 @@ modeset_prepare (int fd)
                     i, res->connectors[i], errno);
             continue;
         }
+        if (force_hdmi) {
+            if (strncmp(drmModeGetConnectorTypeName(conn->connector_type), "HDMI", 4)) {
+                drmModeFreeConnector (conn);
+                continue;
+            }
+        } else {
+            if (force_no_hdmi) {
+                if (!strncmp(drmModeGetConnectorTypeName(conn->connector_type), "HDMI", 4)) {
+                    drmModeFreeConnector (conn);
+                    continue;
+                }
+            }
+        }
+
         /* create a device structure */
         dev = malloc (sizeof (*dev));
         memset (dev, 0, sizeof (*dev));
@@ -185,8 +201,8 @@ modeset_setup_dev (int fd,
     if (conn->count_modes > 1) {
         /*  Kick out any resolution above 720p */
         for (mode = 0; mode < conn->count_modes; mode++) {
-            if (conn->modes[mode].vdisplay <= MAX_HEIGHT_THRESHOLD) {
-                fprintf (stderr, "Defaulting to 720p - id:%d\n", mode);
+            if (conn->modes[mode].vdisplay <= display_max_size) {
+                fprintf (stderr, "Defaulting to %d - id:%d\n", display_max_size, mode);
                 break;
             }
         }
@@ -389,14 +405,10 @@ modeset_cleanup (int fd)
         iter = modeset_list;
         modeset_list = iter->next;
 
-        /* restore saved CRTC configuration */
-        drmModeSetCrtc (fd,
+        /* do not restore saved CRTC configuration but clear it*/
+        drmModeSetCrtc(fd,
                 iter->saved_crtc->crtc_id,
-                iter->saved_crtc->buffer_id,
-                iter->saved_crtc->x,
-                iter->saved_crtc->y,
-                &iter->conn, 1,
-                &iter->saved_crtc->mode);
+                0, 0, 0, 0, 0, NULL);
         drmModeFreeCrtc (iter->saved_crtc);
 
         /* unmap buffer */
@@ -536,6 +548,7 @@ void
 splash_exit (int signum)
 {
     modeset_cleanup (drm_fd);
+    close (drm_fd);
     close(pipe_fd);
 }
 // --------------------------------------------- //
@@ -809,12 +822,15 @@ end:
 // --------------------------------------------- //
 //           Main
 // --------------------------------------------- //
-static const char *shortopts = "wb:f:h";
+static const char *shortopts = "wb:f:hFN";
 
 static const struct option longopts[] = {
     {"wait",    no_argument,       0, 'w'},
     {"background",        required_argument, 0, 'b'},
     {"filename",  required_argument, 0, 'f'},
+    {"force-hdmi", no_argument,       0, 'F'},
+    {"maxsize",  required_argument, 0, 'm'},
+    {"force-no-hdmi", no_argument,       0, 'N'},
     {"help",          no_argument,       0, 'h'},
     {0, 0, 0, 0}
 };
@@ -825,9 +841,12 @@ usage(int error_code)
         "\n"
         "options:\n"
             "  -w, --wait         Display image and wait\n"
-            "  -b, --background=RRGGBB       Set the background color\n"
-            "  -f, --filename=image name     Image to display\n"
-            "  -h, --help                This help text\n\n");
+            "  -b, --background=RRGGBB     Set the background color\n"
+            "  -f, --filename=image name   Image to display\n"
+            "  -F, --force-hdmi            Force to display on hdmi\n"
+            "  -m, --maxsize=max size to negociate\n"
+            "  -N, --force-no-hdmi         Force to not use hdmi"
+            "  -h, --help                  This help text\n\n");
     exit(error_code);
 }
 
@@ -884,10 +903,29 @@ main (int argc, char **argv)
             filename = strdup(optarg);
             printf("Filename of image: %s\n", filename);
             break;
+        case 'F':
+            force_hdmi = 1;
+            printf("Force to use HDMI\n");
+            break;
+        case 'm':
+            display_max_size = atoi(optarg);
+            printf("Max size to negociate: %d\n", display_max_size);
+            break;
+        case 'N':
+            force_no_hdmi = 1;
+            printf("Force to not use HDMI\n");
+            break;
+
         default:
             usage(EXIT_FAILURE);
             break;
         }
+    }
+
+    if (force_hdmi) {
+        //if there is a request to formce to display on HDMI, the opteion to not display on HDMI
+        //MUST be disabled
+        force_no_hdmi = 0;
     }
 
     //set signal
