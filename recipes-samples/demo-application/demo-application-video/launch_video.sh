@@ -37,9 +37,23 @@ else
 	VIDEO_FILE=/usr/local/demo/media/ST2297_visionv3.webm
 fi
 
+# Audio                                                                                                                 
+AUDIOSINK=""                                                                                                            
+COMPATIBLE_BOARD=$(cat /proc/device-tree/compatible | sed "s|st,|,|g" | cut -d ',' -f2)
+case $COMPATIBLE_BOARD in
+stm32mp257f-dk*|stm32mp257f-ev1*)
+        hdmi_status=$(cat /sys/class/drm/card0/*HDMI*/status)
+        if [ "$hdmi_status" = "disconnected" ]; then
+                AUDIOSINK="audio-sink='fakesink '"
+        fi
+        ;;
+        *)                                                                                       
+        ;;
+esac
+
 echo "Gstreamer graph:"
 # WARNING: need to add a space before last ' to avoid that ' are taken by name and not by video-sink
-GRAPH="playbin3 uri=file://$VIDEO_FILE video-sink='$ADDONS gtkwaylandsink name=gtkwsink '"
+GRAPH="playbin3 uri=file://$VIDEO_FILE video-sink='$ADDONS gtkwaylandsink name=gtkwsink ' $AUDIOSINK "
 echo "   $GRAPH"
 
 pty_exec "$GRAPH"
