@@ -6,7 +6,7 @@ SRC_URI = "git://github.com/STMicroelectronics/st-openstlinux-application.git;pr
 
 # Modify these as desired
 PV = "5.0+git${SRCPV}"
-SRCREV = "7c46618178db254520e017a5686a46b1beb413d0"
+SRCREV = "b048c2ea1264d8f69f8cd3d1efc728975831044f"
 
 DEPENDS += "gstreamer1.0 gstreamer1.0-plugins-base gstreamer1.0-plugins-bad gtk+3"
 
