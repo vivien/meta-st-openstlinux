@@ -16,8 +16,6 @@ fi
 start_application_dir=/usr/share/weston-start-at-startup
 start_local_application_dir=/usr/local/weston-start-at-startup
 
-systemctl --user restart pulseaudio
-
 if [ "$USER" == "$WESTON_USER" ]; then
     # Load and run application at startup
     if [ -d "$start_application_dir" ]; then

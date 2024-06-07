@@ -1,12 +1,11 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
 
+
 DEPENDS += "${@oe.utils.conditional('DISTRO_FEATURES', 'pulseaudio', 'pulseaudio', '', d)}"
 
 SRC_URI += " \
             file://weston.ini \
             file://utilities-terminal.png \
-            file://ST_1366x768.png \
-            file://OpenSTLinux_background_1024x600.png \
             file://ST13345_Products_light_blue_24x24.png \
             file://space.png \
             file://weston-checkgpu.service \
@@ -22,12 +21,23 @@ SRC_URI += " \
             file://systemd-graphical-weston-session.sh \
             file://weston.service \
             file://weston.socket \
+            file://seatd-weston.service \
             "
 SRC_URI:append:stm32mpcommon = " file://check-gpu "
 
+# backgrounds
+SRC_URI:append:stm32mp1common = " file://ST30739_background-1280x720.png "
+SRC_URI:append:stm32mp2common = " file://ST30739_background-1920x1080.png "
+DEFAULT_WESTON_BACKGROUND ??= "ST30739_background-1280x720.png"
+DEFAULT_WESTON_BACKGROUND:stm32mp2common ??= "ST30739_background-1920x1080.png"
+
+WESTON_HDMI_MODE ??= "1280x720"
+
+# due to different size of screen following the ship, need to force PACKAGE_ARCH
+PACKAGE_ARCH := "${MACHINE_ARCH}"
+
 FILES:${PN} += " ${datadir}/weston \
          ${sysconfdir}/etc/default \
-         ${systemd_system_unitdir}/weston-launch.service \
          ${sbindir}/ \
          ${sysconfdir}/etc/default \
          ${sysconfdir}/etc/profile.d \
@@ -43,12 +53,15 @@ do_install:append() {
     install -d ${D}${datadir}/weston/backgrounds
     install -d ${D}${datadir}/weston/icon
 
-    install -m 0644 ${WORKDIR}/weston.ini ${D}${sysconfdir}/xdg/weston
-
     install -m 0644 ${WORKDIR}/utilities-terminal.png ${D}${datadir}/weston/icon/utilities-terminal.png
     install -m 0644 ${WORKDIR}/ST13345_Products_light_blue_24x24.png ${D}${datadir}/weston/icon/ST13345_Products_light_blue_24x24.png
-    install -m 0644 ${WORKDIR}/ST_1366x768.png ${D}${datadir}/weston/backgrounds/ST_1366x768.png
-    install -m 0644 ${WORKDIR}/OpenSTLinux_background_1024x600.png ${D}${datadir}/weston/backgrounds/OpenSTLinux_background_1024x600.png
+
+    # backgrounds & weston.ini
+    install -m 0644 ${WORKDIR}/weston.ini ${D}${sysconfdir}/xdg/weston
+    sed -i -e "s:##DEFAULT_BACKGROUND##:${DEFAULT_WESTON_BACKGROUND}:g" ${D}${sysconfdir}/xdg/weston/weston.ini
+    sed -i -e "s:##HDMI_MODE##:${WESTON_HDMI_MODE}:g" ${D}${sysconfdir}/xdg/weston/weston.ini
+
+    install -m 0644 ${WORKDIR}/${DEFAULT_WESTON_BACKGROUND} ${D}${datadir}/weston/backgrounds/
 
     install -m 0644 ${WORKDIR}/space.png ${D}${datadir}/weston/icon/
 
@@ -70,6 +83,8 @@ do_install:append() {
         install -d ${D}${systemd_user_unitdir}
         install -D -p -m0644 ${WORKDIR}/weston.service ${D}${systemd_user_unitdir}/weston.service
         install -D -p -m0644 ${WORKDIR}/weston.socket ${D}${systemd_user_unitdir}/weston.socket
+
+        install -D -p -m0644 ${WORKDIR}/seatd-weston.service ${D}${systemd_system_unitdir}/seatd-weston.service
     fi
 
     install -d ${D}${sysconfdir}/profile.d
@@ -118,7 +133,7 @@ do_install:append:stm32mpcommon() {
 }
 
 SYSTEMD_SERVICE:${PN}:remove = "weston.service weston.socket"
-SYSTEMD_SERVICE:${PN} += "weston-graphical-session.service weston-checkgpu.service"
+SYSTEMD_SERVICE:${PN} += "weston-graphical-session.service weston-checkgpu.service seatd-weston.service"
 #inherit useradd
 USERADD_PARAM:${PN} = "--home /home/weston --shell /bin/sh --user-group -G video,input,tty,audio,dialout weston"
 GROUPADD_PARAM:${PN} = "-r wayland"
