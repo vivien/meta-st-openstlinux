@@ -23,4 +23,5 @@ CORE_IMAGE_EXTRA_INSTALL += " \
     \
     ${@bb.utils.contains('COMBINED_FEATURES', 'optee', 'packagegroup-optee-core', '', d)}   \
     ${@bb.utils.contains('COMBINED_FEATURES', 'optee', 'packagegroup-optee-test', '', d)}   \
+    tcpdump \
     "
