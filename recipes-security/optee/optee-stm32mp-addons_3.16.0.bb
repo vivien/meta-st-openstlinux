@@ -17,7 +17,7 @@ inherit python3native systemd
 S = "${WORKDIR}/git"
 
 EXTRA_OEMAKE += " \
-    TA_DEV_KIT_DIR=${STAGING_INCDIR}/optee/export-user_ta \
+    TA_DEV_KIT_DIR=${STAGING_INCDIR}/optee/${@bb.utils.contains('TUNE_FEATURES', 'aarch64', 'export-user_ta_arm64', 'export-user_ta', d)} \
     OPTEE_CLIENT_EXPORT=${STAGING_DIR_HOST}${prefix} \
     HOST_CROSS_COMPILE=${TARGET_PREFIX} \
     TA_CROSS_COMPILE=${TARGET_PREFIX} \
