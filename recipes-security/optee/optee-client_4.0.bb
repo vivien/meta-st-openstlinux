@@ -10,12 +10,11 @@ SRC_URI = "git://github.com/OP-TEE/optee_client.git;protocol=https;branch=master
            file://tee-supplicant.service \
            file://create-tee-supplicant-env \
            file://optee-udev.rules \
-           file://367-libckteec-Fix-CK_ULONG-conversions-in-C_GetTokenInfo.patch \
     "
 
-SRCREV = "140bf463046071d3ca5ebbde3fb21ee0854e1951"
+SRCREV = "acb0885c117e73cb6c5c9b1dd9054cb3f93507ee"
 
-PV = "3.19.0+git${SRCPV}"
+PV = "4.0.0+git${SRCPV}"
 
 S = "${WORKDIR}/git"
 
