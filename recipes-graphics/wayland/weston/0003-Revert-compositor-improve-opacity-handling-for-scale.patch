@@ -5,6 +5,7 @@ Subject: [PATCH 3/4] Revert "compositor: improve opacity handling for scaled
  surfaces"
 
 This reverts commit 81912dc2a69f24c8fbcb43a2bc1f7860f3085c01.
+Upstream-Status: Pending
 ---
  libweston/compositor.c | 13 +------------
  1 file changed, 1 insertion(+), 12 deletions(-)
