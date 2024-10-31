@@ -3,6 +3,7 @@ From: Christophe Priouzeau <christophe.priouzeau@st.com>
 Date: Tue, 23 Apr 2019 17:18:15 +0200
 Subject: [PATCH] NV12-format-support
 
+Upstream-Status: Inappropriate [ST specific nv12 support format]
 Signed-off-by: Fabien Dessenne <fabien.dessenne@st.com>
 ---
  pixman/pixman-access.c | 79 ++++++++++++++++++++++++++++++++++++++++++++++++++
