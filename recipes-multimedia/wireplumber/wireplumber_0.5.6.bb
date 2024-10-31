@@ -1,7 +1,6 @@
 SUMMARY    = "Session / policy manager implementation for PipeWire"
 HOMEPAGE   = "https://gitlab.freedesktop.org/pipewire/wireplumber"
 BUGTRACKER = "https://gitlab.freedesktop.org/pipewire/wireplumber/issues"
-AUTHOR     = "George Kiagiadakis <george.kiagiadakis@collabora.com>"
 SECTION    = "multimedia"
 
 LICENSE = "MIT"
@@ -11,10 +10,11 @@ DEPENDS = "glib-2.0 glib-2.0-native lua pipewire \
     ${@bb.utils.contains("DISTRO_FEATURES", "gobject-introspection-data", "python3-native python3-lxml-native doxygen-native", "", d)} \
 "
 
-SRCREV = "d3eb77b292655cef333a8f4cab4e861415bc37c2"
-SRC_URI = "git://gitlab.freedesktop.org/pipewire/wireplumber.git;branch=master;protocol=https"
-
-SRC_URI += "file://90-OE-disable-session-dbus-dependent-features.lua"
+SRCREV = "141b2d5d3f793e20f94421c554d8d9c51143ce0d"
+SRC_URI = " \
+    git://gitlab.freedesktop.org/pipewire/wireplumber.git;branch=master;protocol=https \
+    file://90-OE-disable-session-dbus-dependent-features.lua \
+"
 
 S = "${WORKDIR}/git"
 
@@ -50,11 +50,11 @@ PACKAGECONFIG[dbus] = ""
 PACKAGESPLITFUNCS:prepend = " split_dynamic_packages "
 PACKAGESPLITFUNCS:append = " set_dynamic_metapkg_rdepends "
 
-WP_MODULE_SUBDIR = "wireplumber-0.4"
+WP_MODULE_SUBDIR = "wireplumber-0.5"
 
 do_install:append() {
     if ${@bb.utils.contains('PACKAGECONFIG', 'dbus', 'false', 'true', d)}; then
-        install -m 0644 ${WORKDIR}/90-OE-disable-session-dbus-dependent-features.lua ${D}${datadir}/wireplumber/main.lua.d
+        install -m 0644 ${UNPACKDIR}/90-OE-disable-session-dbus-dependent-features.lua ${D}${datadir}/wireplumber/main.lua.d
     fi
 }
 
@@ -113,11 +113,6 @@ python set_dynamic_metapkg_rdepends () {
     d.setVar('DESCRIPTION:' + wp_module_metapkg, wp_module_pn + ' meta package')
 }
 
-do_install:append() {
-    # modify bluetooth configuration to not used logind
-    sed -i "s|with-logind\"] = true,|with-logind\"] = false,|g" ${D}${datadir}/wireplumber/bluetooth.lua.d/50-bluez-config.lua
-}
-
 PACKAGES =+ "\
     libwireplumber \
     ${PN}-default-config \
@@ -148,4 +143,3 @@ FILES:${PN}-scripts += "${datadir}/wireplumber/scripts/*"
 # Dynamic packages (see set_dynamic_metapkg_rdepends).
 FILES:${PN}-modules = ""
 RRECOMMENDS:${PN}-modules += "${PN}-modules-meta"
-
