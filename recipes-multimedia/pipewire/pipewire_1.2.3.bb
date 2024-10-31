@@ -2,7 +2,6 @@ SUMMARY     = "Multimedia processing server for Linux"
 DESCRIPTION = "Linux server for handling and routing audio and video streams between applications and multimedia I/O devices"
 HOMEPAGE    = "https://pipewire.org/"
 BUGTRACKER  = "https://gitlab.freedesktop.org/pipewire/pipewire/issues"
-AUTHOR      = "Wim Taymans <wtaymans@redhat.com>"
 SECTION     = "multimedia"
 
 LICENSE = "MIT & LGPL-2.1-or-later & GPL-2.0-only"
@@ -13,9 +12,8 @@ LIC_FILES_CHKSUM = " \
 
 DEPENDS = "dbus ncurses"
 
-SRCREV = "4debdcd40b055b3eaa83a8f4443aa990ea566bfe"
-SRC_URI = "git://gitlab.freedesktop.org/pipewire/pipewire.git;branch=master;protocol=https"
-SRC_URI += "file://fd33d2d3bb6333c7d6e74cbaa806bff2d908f589.patch"
+SRCREV = "e2a76824e2b112b15ae4a1a3d444696d5526f8d8"
+SRC_URI = "git://gitlab.freedesktop.org/pipewire/pipewire.git;branch=1.2;protocol=https"
 
 S = "${WORKDIR}/git"
 
@@ -74,6 +72,9 @@ EXTRA_OEMESON += " \
 # mode but it looks like clang still does
 CFLAGS:append = " -Wno-typedef-redefinition"
 
+# Specify linking with -latomic on architectures missing 64bit atomics.
+LDFLAGS += "${@bb.utils.contains_any('TUNE_FEATURES', 'riscv32 armv5 mips ppc32 m32', '-latomic', '', d)}"
+
 # According to wireplumber documentation only one session manager should be installed at a time
 # Possible options are media-session, which has fewer dependencies but is very simple,
 # or wireplumber, which is more powerful.
@@ -85,7 +86,7 @@ BLUETOOTH_AAC = "${@bb.utils.contains('LICENSE_FLAGS_ACCEPTED', 'commercial', 'b
 PACKAGECONFIG:class-target ??= " \
     ${@bb.utils.contains('DISTRO_FEATURES', 'zeroconf', 'avahi', '', d)} \
     ${@bb.utils.contains('DISTRO_FEATURES', 'bluetooth', 'bluez bluez-opus ${BLUETOOTH_AAC}', '', d)} \
-    ${@bb.utils.contains('DISTRO_FEATURES', 'systemd', 'systemd systemd-user-service', '', d)} \
+    ${@bb.utils.contains('DISTRO_FEATURES', 'systemd', 'systemd systemd-system-service systemd-user-service', '', d)} \
     ${@bb.utils.filter('DISTRO_FEATURES', 'alsa vulkan pulseaudio', d)} \
     ${PIPEWIRE_SESSION_MANAGER} \
     ${FFMPEG_AVAILABLE} avahi flatpak gstreamer gsettings jack libusb pw-cat raop sndfile v4l2 udev volume webrtc-echo-cancelling libcamera readline \
@@ -137,7 +138,7 @@ PACKAGECONFIG[udev] = "-Dudev=enabled,-Dudev=disabled,udev"
 PACKAGECONFIG[v4l2] = "-Dv4l2=enabled,-Dv4l2=disabled,udev"
 PACKAGECONFIG[volume] = "-Dvolume=enabled,-Dvolume=disabled"
 PACKAGECONFIG[vulkan] = "-Dvulkan=enabled,-Dvulkan=disabled,vulkan-headers vulkan-loader"
-PACKAGECONFIG[webrtc-echo-cancelling] = "-Decho-cancel-webrtc=enabled,-Decho-cancel-webrtc=disabled,webrtc-audio-processing"
+PACKAGECONFIG[webrtc-echo-cancelling] = "-Decho-cancel-webrtc=enabled,-Decho-cancel-webrtc=disabled,webrtc-audio-processing-1"
 PACKAGECONFIG[wireplumber] = ",,,wireplumber,,media-session"
 
 PACKAGESPLITFUNCS:prepend = " split_dynamic_packages "
@@ -294,6 +295,7 @@ FILES:${PN}-tools = " \
     ${bindir}/pw-cat \
     ${bindir}/pw-cli \
     ${bindir}/pw-config \
+    ${bindir}/pw-container \
     ${bindir}/pw-dot \
     ${bindir}/pw-dsdplay \
     ${bindir}/pw-dump \
