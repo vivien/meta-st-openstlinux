@@ -1,0 +1,5895 @@
+From 5ebafc7fbf6fe5870661310db52be6fb2a9b852f Mon Sep 17 00:00:00 2001
+From: Christophe Priouzeau <christophe.priouzeau@foss.st.com>
+Date: Mon, 4 Nov 2024 09:33:59 +0100
+Subject: [PATCH] 0.3.0-stm32mp add dcmipp ipa
+
+---
+ README.rst                                    |   16 +
+ include/libcamera/internal/media_device.h     |    2 +-
+ include/libcamera/ipa/dcmipp.mojom            |   35 +
+ include/libcamera/ipa/meson.build             |    1 +
+ include/linux/stm32-dcmipp-config.h           |  194 +++
+ include/linux/v4l2-controls.h                 |   41 +
+ include/linux/videodev2.h                     |    5 +
+ meson.build                                   |    1 +
+ meson_options.txt                             |    5 +-
+ src/apps/cam/camera_session.cpp               |   11 +-
+ src/apps/common/options.cpp                   |   12 +-
+ src/gstreamer/gstlibcamera-utils.cpp          |   16 +
+ src/gstreamer/gstlibcamerapad.cpp             |    4 +
+ src/gstreamer/gstlibcamerasrc.cpp             |  139 +-
+ src/ipa/dcmipp/algorithms/aec.cpp             |  221 +++
+ src/ipa/dcmipp/algorithms/aec.h               |   50 +
+ src/ipa/dcmipp/algorithms/algorithm.h         |   35 +
+ src/ipa/dcmipp/algorithms/awb.cpp             |  492 +++++++
+ src/ipa/dcmipp/algorithms/awb.h               |   61 +
+ src/ipa/dcmipp/algorithms/badpixel.cpp        |  148 ++
+ src/ipa/dcmipp/algorithms/badpixel.h          |   50 +
+ src/ipa/dcmipp/algorithms/blc.cpp             |  121 ++
+ src/ipa/dcmipp/algorithms/blc.h               |   44 +
+ src/ipa/dcmipp/algorithms/contrast.cpp        |  119 ++
+ src/ipa/dcmipp/algorithms/contrast.h          |   44 +
+ src/ipa/dcmipp/algorithms/demosaicing.cpp     |  110 ++
+ src/ipa/dcmipp/algorithms/demosaicing.h       |   44 +
+ src/ipa/dcmipp/algorithms/meson.build         |   11 +
+ src/ipa/dcmipp/algorithms/statistic.cpp       |  177 +++
+ src/ipa/dcmipp/algorithms/statistic.h         |   44 +
+ src/ipa/dcmipp/data/imx335.yaml               |   54 +
+ src/ipa/dcmipp/data/meson.build               |    9 +
+ src/ipa/dcmipp/dcmipp.cpp                     |  558 +++++++
+ src/ipa/dcmipp/ipa_context.h                  |  120 ++
+ src/ipa/dcmipp/meson.build                    |   32 +
+ src/ipa/dcmipp/module.h                       |   27 +
+ src/ipa/rpi/controller/rpi/alsc.cpp           |    7 +-
+ src/libcamera/control_ids_draft.yaml          |  207 +++
+ src/libcamera/ipc_unixsocket.cpp              |   13 +-
+ src/libcamera/media_device.cpp                |    6 +-
+ src/libcamera/pipeline/dcmipp/dcmipp.cpp      | 1311 +++++++++++++++++
+ src/libcamera/pipeline/dcmipp/dcmipp.h        |  131 ++
+ src/libcamera/pipeline/dcmipp/dcmipp_path.cpp |  513 +++++++
+ src/libcamera/pipeline/dcmipp/meson.build     |    5 +
+ src/libcamera/v4l2_device.cpp                 |   20 +-
+ 45 files changed, 5227 insertions(+), 39 deletions(-)
+ create mode 100644 include/libcamera/ipa/dcmipp.mojom
+ create mode 100644 include/linux/stm32-dcmipp-config.h
+ create mode 100644 src/ipa/dcmipp/algorithms/aec.cpp
+ create mode 100644 src/ipa/dcmipp/algorithms/aec.h
+ create mode 100644 src/ipa/dcmipp/algorithms/algorithm.h
+ create mode 100644 src/ipa/dcmipp/algorithms/awb.cpp
+ create mode 100644 src/ipa/dcmipp/algorithms/awb.h
+ create mode 100644 src/ipa/dcmipp/algorithms/badpixel.cpp
+ create mode 100644 src/ipa/dcmipp/algorithms/badpixel.h
+ create mode 100644 src/ipa/dcmipp/algorithms/blc.cpp
+ create mode 100644 src/ipa/dcmipp/algorithms/blc.h
+ create mode 100644 src/ipa/dcmipp/algorithms/contrast.cpp
+ create mode 100644 src/ipa/dcmipp/algorithms/contrast.h
+ create mode 100644 src/ipa/dcmipp/algorithms/demosaicing.cpp
+ create mode 100644 src/ipa/dcmipp/algorithms/demosaicing.h
+ create mode 100644 src/ipa/dcmipp/algorithms/meson.build
+ create mode 100644 src/ipa/dcmipp/algorithms/statistic.cpp
+ create mode 100644 src/ipa/dcmipp/algorithms/statistic.h
+ create mode 100644 src/ipa/dcmipp/data/imx335.yaml
+ create mode 100644 src/ipa/dcmipp/data/meson.build
+ create mode 100644 src/ipa/dcmipp/dcmipp.cpp
+ create mode 100644 src/ipa/dcmipp/ipa_context.h
+ create mode 100644 src/ipa/dcmipp/meson.build
+ create mode 100644 src/ipa/dcmipp/module.h
+ create mode 100644 src/libcamera/pipeline/dcmipp/dcmipp.cpp
+ create mode 100644 src/libcamera/pipeline/dcmipp/dcmipp.h
+ create mode 100644 src/libcamera/pipeline/dcmipp/dcmipp_path.cpp
+ create mode 100644 src/libcamera/pipeline/dcmipp/meson.build
+
+diff --git a/README.rst b/README.rst
+index 1da7a3d6..d605182b 100644
+--- a/README.rst
++++ b/README.rst
+@@ -178,6 +178,22 @@ Which can be received on another device over the network with:
+    gst-launch-1.0 tcpclientsrc host=$DEVICE_IP port=5000 ! \
+         multipartdemux ! jpegdec ! autovideosink
+ 
++The GStreamer element also supports multiple streams. This is achieved by
++requesting additionnal source pads. Downstream caps filteris can be used
++to choose specific parameters like resolution and pixel format. The pad
++property ``stream-role`` can be used to select a role.
++
++The following example displayis a 640x480 view finder while streamiing JPEG
++encoded 800x600 video. You can use the receiver pipleine above to view the
++remote stream from another device.
++
++.. code::
++
++   gst-launch-1.0 libcamerasrc name=cs src::stream-role=view-finder src_0::stream-role=video-recording \
++       cs.src ! queue ! video/x-raw,width=640,height=480 ! videoconvert ! autovideosink \
++       cs.src_0 ! queue ! video/x-raw,width=800,height=600 ! videoconvert ! \
++       jpegenc ! multipartmux ! tcpserversink host=0.0.0.0 port=5000
++
+ .. section-end-getting-started
+ 
+ Troubleshooting
+diff --git a/include/libcamera/internal/media_device.h b/include/libcamera/internal/media_device.h
+index 3b624e00..bf2e475d 100644
+--- a/include/libcamera/internal/media_device.h
++++ b/include/libcamera/internal/media_device.h
+@@ -33,7 +33,7 @@ public:
+ 	bool busy() const { return acquired_; }
+ 
+ 	bool lock();
+-	bool unlock();
++	void unlock();
+ 
+ 	int populate();
+ 	bool isValid() const { return valid_; }
+diff --git a/include/libcamera/ipa/dcmipp.mojom b/include/libcamera/ipa/dcmipp.mojom
+new file mode 100644
+index 00000000..b784543c
+--- /dev/null
++++ b/include/libcamera/ipa/dcmipp.mojom
+@@ -0,0 +1,35 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++
++module ipa.dcmipp;
++
++import "include/libcamera/ipa/core.mojom";
++
++interface IPADcmippInterface {
++	init(libcamera.IPASettings settings,
++	     uint32 hwRevision,
++	     libcamera.IPACameraSensorInfo sensorInfo,
++	     libcamera.ControlInfoMap sensorControls)
++		=> (int32 ret, libcamera.ControlInfoMap ipaControls);
++	configure(libcamera.IPACameraSensorInfo sensorInfo,
++		  libcamera.ControlInfoMap sensorControls,
++		  uint32 ispDecimationRatio)
++		=> (int32 ret, libcamera.ControlInfoMap ipaControls);
++
++	start() => (int32 ret);
++	stop();
++
++	mapBuffers(array<libcamera.IPABuffer> buffers);
++	unmapBuffers(array<uint32> ids);
++
++	[async] processStatsBuffer(uint32 frame, uint32 bufferId);
++	[async] fillParamsBuffer(uint32 frame, uint32 bufferId);
++	[async] queueRequest(uint32 frame, libcamera.ControlList controls);
++};
++
++interface IPADcmippEventInterface {
++	statsBufferProcessed(uint32 bufferId);
++	paramsBufferReady(uint32 bufferId);
++	metadataReady(uint32 frame, libcamera.ControlList sensorControls);
++	setSensorControls(uint32 frame, libcamera.ControlList sensorControls);
++	setIspControls(uint32 frame, libcamera.ControlList ispControls);
++};
+diff --git a/include/libcamera/ipa/meson.build b/include/libcamera/ipa/meson.build
+index 3352d08f..925aad2b 100644
+--- a/include/libcamera/ipa/meson.build
++++ b/include/libcamera/ipa/meson.build
+@@ -62,6 +62,7 @@ libcamera_generated_ipa_headers += custom_target('core_ipa_serializer_h',
+ 
+ # Mapping from pipeline handler name to mojom file
+ pipeline_ipa_mojom_mapping = {
++    'dcmipp': 'dcmipp.mojom',
+     'ipu3': 'ipu3.mojom',
+     'rkisp1': 'rkisp1.mojom',
+     'rpi/vc4': 'raspberrypi.mojom',
+diff --git a/include/linux/stm32-dcmipp-config.h b/include/linux/stm32-dcmipp-config.h
+new file mode 100644
+index 00000000..af80b3b3
+--- /dev/null
++++ b/include/linux/stm32-dcmipp-config.h
+@@ -0,0 +1,194 @@
++/* SPDX-License-Identifier: ((GPL-2.0+ WITH Linux-syscall-note) OR MIT) */
++/*
++ * STM32 DCMIPP ISP userspace API
++ * Copyright (C) STMicroelectronics SA 2023
++ */
++
++#ifndef _UAPI_STM32_DCMIPP_CONFIG_H
++#define _UAPI_STM32_DCMIPP_CONFIG_H
++
++#include <linux/types.h>
++
++/* Bad Pixel Removal */
++#define STM32_DCMIPP_ISP_BPR		(1U << 0)
++/* Black Level Correction */
++#define STM32_DCMIPP_ISP_BLC		(1U << 1)
++/* Exposure Control */
++#define STM32_DCMIPP_ISP_EX		(1U << 2)
++/* Demosaicing filters */
++#define STM32_DCMIPP_ISP_DM		(1U << 3)
++/* Color conversion Control */
++#define STM32_DCMIPP_ISP_CC		(1U << 4)
++/* Contrast Enhancement */
++#define STM32_DCMIPP_ISP_CE		(1U << 5)
++
++/**
++ * struct stm32_dcmipp_isp_bpr_cfg - STM32 DCMIPP ISP bad pixel removal
++ *
++ * @en: enable / disable the bad pixel removal block
++ * @strength: strength (aggressiveness) of the bad pixel detection
++ */
++struct stm32_dcmipp_isp_bpr_cfg {
++	__u32 en;
++	__u32 strength;
++};
++
++/**
++ * struct stm32_dcmipp_isp_blc_cfg - STM32 DCMIPP ISP black level correction
++ *
++ * @en: enable / disable the black level correction block
++ * @blc_r: Correction on the red component
++ * @blc_g: Correction on the green component
++ * @blc_b: Correction on the blue component
++ */
++struct stm32_dcmipp_isp_blc_cfg {
++	__u32 en;
++	__u8 blc_r;
++	__u8 blc_g;
++	__u8 blc_b;
++};
++
++/**
++ * struct stm32_dcmipp_isp_ex_cfg - STM32 DCMIPP ISP exposure control
++ *
++ * @en: enable / disable the exposure control block
++ * @shift_r: red component exposure shift
++ * @mult_r: red component exposure multiplier
++ * @shift_g: green component exposure shift
++ * @mult_g: green component exposure multiplier
++ * @shift_b: blue component exposure shift
++ * @mult_b: blue component exposure multiplier
++ */
++struct stm32_dcmipp_isp_ex_cfg {
++	__u32 en;
++	__u8 shift_r;
++	__u8 mult_r;
++	__u8 shift_g;
++	__u8 mult_g;
++	__u8 shift_b;
++	__u8 mult_b;
++};
++
++/**
++ * struct stm32_dcmipp_isp_dm_cfg - STM32 DCMIPP ISP demosaicing filters
++ *
++ * @edge: strength of the edge detection
++ * @lineh: strength of the horizontal line detection
++ * @linev: strength of the vertical line detection
++ * @peak: strength of the peak detection
++ */
++struct stm32_dcmipp_isp_dm_cfg {
++	__u8 edge;
++	__u8 lineh;
++	__u8 linev;
++	__u8 peak;
++};
++
++enum stm32_dcmipp_isp_cc_clamp {
++	STM32_DCMIPP_ISP_CC_CLAMP_DISABLED,
++	STM32_DCMIPP_ISP_CC_CLAMP_Y235_U240_V240,
++	STM32_DCMIPP_ISP_CC_CLAMP_YUV235,
++};
++
++/**
++ * struct stm32_dcmipp_isp_cc_cfg - STM32 DCMIPP ISP color conversion
++ *
++ * @en: enable / disable the color conversion block
++ * @clamp: clamp configuration (from enum stm32_dcmipp_isp_cc_clamp)
++ * @rr: row 1 col 1 value of the matrix
++ * @rg: row 1 col 2 value of the matrix
++ * @rb: row 1 col 3 value of the matrix
++ * @ra: row 1 added value of the matrix
++ * @gr: row 2 col 1 value of the matrix
++ * @gg: row 2 col 2 value of the matrix
++ * @gb: row 2 col 3 value of the matrix
++ * @ga: row 2 added value of the matrix
++ * @br: row 3 col 1 value of the matrix
++ * @bg: row 3 col 2 value of the matrix
++ * @bb: row 3 col 3 value of the matrix
++ * @ba: row 3 added value of the matrix
++ */
++struct stm32_dcmipp_isp_cc_cfg {
++	__u32 en;
++	__u32 clamp;
++	__u16 rr;
++	__u16 rg;
++	__u16 rb;
++	__u16 ra;
++	__u16 gr;
++	__u16 gg;
++	__u16 gb;
++	__u16 ga;
++	__u16 br;
++	__u16 bg;
++	__u16 bb;
++	__u16 ba;
++};
++
++/**
++ * struct stm32_dcmipp_isp_ce_cfg - STM32 DCMIPP ISP contrast enhancement
++ *
++ * @en: enable / disable the contrast enhancement block
++ * @lum: 9 elements table of luminance enhancement (value 16 is neutral)
++ */
++struct stm32_dcmipp_isp_ce_cfg {
++	__u32 en;
++	__u8 lum[9];
++};
++
++/**
++ * struct stm32_dcmipp_isp_ctrls_cfg - STM32 DCMIPP ISP Controls
++ *
++ * @bpr_cfg: configuration of the bad pixel removal block
++ * @blc_cfg: configuration of the black level correction block
++ * @ex_cfg: configuration of the exposure block
++ * @dm_cfg: configuration of the demosaicing filters block
++ * @cc_cfg: configuration of the color conversion block
++ * @ce_cfg: configuration of the contrast enhancement block
++ */
++struct stm32_dcmipp_isp_ctrls_cfg {
++	struct stm32_dcmipp_isp_bpr_cfg bpr_cfg;
++	struct stm32_dcmipp_isp_blc_cfg blc_cfg;
++	struct stm32_dcmipp_isp_ex_cfg ex_cfg;
++	struct stm32_dcmipp_isp_dm_cfg dm_cfg;
++	struct stm32_dcmipp_isp_cc_cfg cc_cfg;
++	struct stm32_dcmipp_isp_ce_cfg ce_cfg;
++};
++
++/**
++ * struct stm32_dcmipp_params_cfg - STM32 DCMIPP ISP Input Parameters Meta Data
++ *
++ * @module_cfg_update: mask the config bits of which module should be updated
++ * @ctrls: configuration of other ISP blocks
++ */
++struct stm32_dcmipp_params_cfg {
++	__u32 module_cfg_update;
++
++	struct stm32_dcmipp_isp_ctrls_cfg ctrls;
++};
++
++/**
++ * struct stm32_dcmipp_stat_avr_bins - average & bins statistics
++ *
++ * @average_rgb[3]: average value of R/G/B components
++ * @bins[12]: 12 values histogram
++ */
++struct stm32_dcmipp_stat_avr_bins {
++	__u32 average_RGB[3];
++	__u32 bins[12];
++};
++
++/**
++ * struct stm32_dcmipp_stat_buf - statistics buffer
++ *
++ * @pre: average & bins statistics at pre-demosaicing location
++ * @post: average & bins statistics at post-demosaicing location
++ * @bad_pixel_count: number of bad pixels detected in the frame
++ */
++struct stm32_dcmipp_stat_buf {
++	struct stm32_dcmipp_stat_avr_bins pre;
++	struct stm32_dcmipp_stat_avr_bins post;
++	__u32 bad_pixel_count;
++};
++
++#endif
+diff --git a/include/linux/v4l2-controls.h b/include/linux/v4l2-controls.h
+index b9f64810..23772e04 100644
+--- a/include/linux/v4l2-controls.h
++++ b/include/linux/v4l2-controls.h
+@@ -1218,6 +1218,47 @@ enum v4l2_jpeg_chroma_subsampling {
+ #define V4L2_CID_DEINTERLACING_MODE		(V4L2_CID_IMAGE_PROC_CLASS_BASE + 4)
+ #define V4L2_CID_DIGITAL_GAIN			(V4L2_CID_IMAGE_PROC_CLASS_BASE + 5)
+ 
++#define V4L2_CID_ISP_STAT_REGION		(V4L2_CID_IMAGE_PROC_CLASS_BASE + 10)
++/**
++ * struct v4l2_ctrl_isp_stat_region - Region where ISP statistics are collected
++ *
++ * @nb_regions: number of regions
++ * @top: top coordinate of a region
++ * @left: left coordinate of a region
++ * @width: width of a region
++ * @height: height of a region
++ */
++struct v4l2_ctrl_isp_stat_region {
++	__u8 nb_regions;
++	__u32 top[25];
++	__u32 left[25];
++	__u32 width[25];
++	__u32 height[25];
++};
++
++#define V4L2_CID_ISP_STAT_AVG_FILTER		(V4L2_CID_IMAGE_PROC_CLASS_BASE + 12)
++enum v4l2_isp_stat_avg_filter {
++	V4L2_STAT_AVG_FILTER_NONE	= 0,
++	V4L2_STAT_AVG_FILTER_EXCL16	= 1,
++	V4L2_STAT_AVG_FILTER_EXCL32	= 2,
++	V4L2_STAT_AVG_FILTER_EXCL64	= 3,
++};
++
++#define V4L2_CID_ISP_STAT_BIN_COMP		(V4L2_CID_IMAGE_PROC_CLASS_BASE + 13)
++enum v4l2_isp_stat_bin_comp {
++	V4L2_STAT_BIN_COMP_R		= 0,
++	V4L2_STAT_BIN_COMP_G		= 1,
++	V4L2_STAT_BIN_COMP_B		= 2,
++	V4L2_STAT_BIN_COMP_L		= 3,
++};
++
++#define V4L2_CID_ISP_STAT_PROFILE		(V4L2_CID_IMAGE_PROC_CLASS_BASE + 14)
++enum v4l2_isp_stat_profile {
++	V4L2_STAT_PROFILE_FULL		= 0,
++	V4L2_STAT_PROFILE_AVERAGE_PRE	= 1,
++	V4L2_STAT_PROFILE_AVERAGE_POST	= 2,
++};
++
+ /*  DV-class control IDs defined by V4L2 */
+ #define V4L2_CID_DV_CLASS_BASE			(V4L2_CTRL_CLASS_DV | 0x900)
+ #define V4L2_CID_DV_CLASS			(V4L2_CTRL_CLASS_DV | 1)
+diff --git a/include/linux/videodev2.h b/include/linux/videodev2.h
+index 0b5482a0..acc17e57 100644
+--- a/include/linux/videodev2.h
++++ b/include/linux/videodev2.h
+@@ -837,6 +837,10 @@ struct v4l2_pix_format {
+ /* The metadata format identifier for FE stats buffers. */
+ #define V4L2_META_FMT_RPI_FE_STATS v4l2_fourcc('R', 'P', 'F', 'S')
+ 
++/* Vendor specific - used for STM32_DCMIPP camera sub-system */
++#define V4L2_META_FMT_ST_DCMIPP_ISP_PARAMS	v4l2_fourcc('S', 'T', 'I', 'P') /* STM32 DCMIPP ISP Parameters */
++#define V4L2_META_FMT_ST_DCMIPP_ISP_STAT	v4l2_fourcc('S', 'T', 'I', 'S') /* STM32 DCMIPP ISP Statistics */
++
+ /* priv field value to indicates that subsequent fields are valid. */
+ #define V4L2_PIX_FMT_PRIV_MAGIC		0xfeedcafe
+ 
+@@ -1880,6 +1884,7 @@ enum v4l2_ctrl_type {
+ 	V4L2_CTRL_TYPE_HEVC_SCALING_MATRIX	= 0x0273,
+ 	V4L2_CTRL_TYPE_HEVC_DECODE_PARAMS	= 0x0274,
+ 
++	V4L2_CTRL_TYPE_ISP_STAT_REGION     = 0x0310,
+ 	V4L2_CTRL_TYPE_AV1_SEQUENCE	    = 0x280,
+ 	V4L2_CTRL_TYPE_AV1_TILE_GROUP_ENTRY = 0x281,
+ 	V4L2_CTRL_TYPE_AV1_FRAME	    = 0x282,
+diff --git a/meson.build b/meson.build
+index 1902ea2f..c0f49810 100644
+--- a/meson.build
++++ b/meson.build
+@@ -206,6 +206,7 @@ pipelines_support = {
+     'rkisp1':       arch_arm,
+     'rpi/vc4':      arch_arm,
+     'simple':       arch_arm,
++    'dcmipp':       arch_arm,
+     'uvcvideo':     ['any'],
+     'vimc':         ['test'],
+ }
+diff --git a/meson_options.txt b/meson_options.txt
+index 7aa41249..933833ea 100644
+--- a/meson_options.txt
++++ b/meson_options.txt
+@@ -32,7 +32,7 @@ option('gstreamer',
+ 
+ option('ipas',
+         type : 'array',
+-        choices : ['ipu3', 'rkisp1', 'rpi/vc4', 'simple', 'vimc'],
++        choices : ['dcmipp', 'ipu3', 'rkisp1', 'rpi/vc4', 'simple', 'vimc'],
+         description : 'Select which IPA modules to build')
+ 
+ option('lc-compliance',
+@@ -53,7 +53,8 @@ option('pipelines',
+             'rpi/vc4',
+             'simple',
+             'uvcvideo',
+-            'vimc'
++            'vimc',
++            'dcmipp'
+         ],
+         description : 'Select which pipeline handlers to build. If this is set to "auto", all the pipelines applicable to the target architecture will be built. If this is set to "all", all the pipelines will be built. If both are selected then "all" will take precedence.')
+ 
+diff --git a/src/apps/cam/camera_session.cpp b/src/apps/cam/camera_session.cpp
+index f13355ba..35e2451a 100644
+--- a/src/apps/cam/camera_session.cpp
++++ b/src/apps/cam/camera_session.cpp
+@@ -360,8 +360,15 @@ int CameraSession::queueRequest(Request *request)
+ 	if (captureLimit_ && queueCount_ >= captureLimit_)
+ 		return 0;
+ 
+-	if (script_)
+-		request->controls() = script_->frameControls(queueCount_);
++	if (script_) {
++		const ControlList &controls = script_->frameControls(queueCount_);
++		for (auto const &ctrl : controls)
++			std::cout << "\tRequest ctrl: "
++				  << controls::controls.at(ctrl.first)->name()
++				  << " = " << ctrl.second.toString()
++				  << std::endl;
++		request->controls() = controls;
++	}
+ 
+ 	queueCount_++;
+ 
+diff --git a/src/apps/common/options.cpp b/src/apps/common/options.cpp
+index f6d4f006..ab19aa3d 100644
+--- a/src/apps/common/options.cpp
++++ b/src/apps/common/options.cpp
+@@ -879,8 +879,8 @@ OptionsParser::Options OptionsParser::parse(int argc, char **argv)
+ 	 * Allocate short and long options arrays large enough to contain all
+ 	 * options.
+ 	 */
+-	char *shortOptions = (char*)malloc(optionsMap_.size() * 3 + 2);
+-	struct option *longOptions = (struct option*)malloc(sizeof(struct option) * (optionsMap_.size() + 1));
++	char shortOptions[optionsMap_.size() * 3 + 2];
++	struct option longOptions[optionsMap_.size() + 1];
+ 	unsigned int ids = 0;
+ 	unsigned int idl = 0;
+ 
+@@ -935,16 +935,12 @@ OptionsParser::Options OptionsParser::parse(int argc, char **argv)
+ 			std::cerr << argv[optind - 1] << std::endl;
+ 
+ 			usage();
+-			free(shortOptions);
+-			free(longOptions);
+ 			return options;
+ 		}
+ 
+ 		const Option &option = *optionsMap_[c];
+ 		if (!parseValue(option, optarg, &options)) {
+ 			usage();
+-			free(shortOptions);
+-			free(longOptions);
+ 			return options;
+ 		}
+ 	}
+@@ -953,14 +949,10 @@ OptionsParser::Options OptionsParser::parse(int argc, char **argv)
+ 		std::cerr << "Invalid non-option argument '" << argv[optind]
+ 			  << "'" << std::endl;
+ 		usage();
+-		free(shortOptions);
+-		free(longOptions);
+ 		return options;
+ 	}
+ 
+ 	options.valid_ = true;
+-	free(shortOptions);
+-	free(longOptions);
+ 	return options;
+ }
+ 
+diff --git a/src/gstreamer/gstlibcamera-utils.cpp b/src/gstreamer/gstlibcamera-utils.cpp
+index ec4da435..d7ac64cb 100644
+--- a/src/gstreamer/gstlibcamera-utils.cpp
++++ b/src/gstreamer/gstlibcamera-utils.cpp
+@@ -322,6 +322,22 @@ bare_structure_from_format(const PixelFormat &format)
+ 	case formats::SGBRG8:
+ 	case formats::SGRBG8:
+ 	case formats::SRGGB8:
++	case formats::SBGGR10:
++	case formats::SGBRG10:
++	case formats::SGRBG10:
++	case formats::SRGGB10:
++	case formats::SBGGR12:
++	case formats::SGBRG12:
++	case formats::SGRBG12:
++	case formats::SRGGB12:
++	case formats::SBGGR14:
++	case formats::SGBRG14:
++	case formats::SGRBG14:
++	case formats::SRGGB14:
++	case formats::SBGGR16:
++	case formats::SGBRG16:
++	case formats::SGRBG16:
++	case formats::SRGGB16:
+ 		return gst_structure_new("video/x-bayer", "format", G_TYPE_STRING,
+ 					 bayer_format_to_string(format), nullptr);
+ 
+diff --git a/src/gstreamer/gstlibcamerapad.cpp b/src/gstreamer/gstlibcamerapad.cpp
+index 7b22aebe..af0fe477 100644
+--- a/src/gstreamer/gstlibcamerapad.cpp
++++ b/src/gstreamer/gstlibcamerapad.cpp
+@@ -99,6 +99,10 @@ gst_libcamera_stream_role_get_type()
+ 			static_cast<gint>(StreamRole::Viewfinder),
+ 			"libcamera::Viewfinder",
+ 			"view-finder",
++		}, {
++			static_cast<gint>(StreamRole::Raw),
++			"libcamera::Raw",
++			"raw",
+ 		},
+ 		{ 0, NULL, NULL }
+ 	};
+diff --git a/src/gstreamer/gstlibcamerasrc.cpp b/src/gstreamer/gstlibcamerasrc.cpp
+index 6a95b6af..765fdb74 100644
+--- a/src/gstreamer/gstlibcamerasrc.cpp
++++ b/src/gstreamer/gstlibcamerasrc.cpp
+@@ -129,6 +129,9 @@ struct GstLibcameraSrcState {
+ 	ControlList initControls_;
+ 	guint group_id_;
+ 
++	GMutex controlsLock_; /* Protects pendingControls_ */
++	ControlList pendingControls_;
++
+ 	int queueRequest();
+ 	void requestCompleted(Request *request);
+ 	int processRequest();
+@@ -144,6 +147,12 @@ struct _GstLibcameraSrc {
+ 	gchar *camera_name;
+ 	controls::AfModeEnum auto_focus_mode = controls::AfModeManual;
+ 
++	struct LibCameraControls {
++		/* Add all ISP controls */
++		bool black_level_enable;
++		int black_level_values[3];
++	} ctrl;
++
+ 	std::atomic<GstEvent *> pending_eos;
+ 
+ 	GstLibcameraSrcState *state;
+@@ -155,9 +164,16 @@ enum {
+ 	PROP_0,
+ 	PROP_CAMERA_NAME,
+ 	PROP_AUTO_FOCUS_MODE,
++	PROP_BLACK_LEVEL_ENABLE,
++	PROP_BLACK_LEVEL_VALUES,
+ };
+ 
++static void gst_libcamera_src_child_proxy_init(gpointer g_iface,
++					       gpointer iface_data);
++
+ G_DEFINE_TYPE_WITH_CODE(GstLibcameraSrc, gst_libcamera_src, GST_TYPE_ELEMENT,
++			G_IMPLEMENT_INTERFACE(GST_TYPE_CHILD_PROXY,
++					      gst_libcamera_src_child_proxy_init)
+ 			GST_DEBUG_CATEGORY_INIT(source_debug, "libcamerasrc", 0,
+ 						"libcamera Source"))
+ 
+@@ -203,7 +219,19 @@ int GstLibcameraSrcState::queueRequest()
+ 	}
+ 
+ 	GST_TRACE_OBJECT(src_, "Requesting buffers");
+-	cam_->queueRequest(wrap->request_.get());
++
++	Request *req = wrap->request_.get();
++
++	/* Add then clear pending controls to the request */
++	ControlList controls;
++	{
++		GLibLocker locker(&src_->state->controlsLock_);
++		controls = src_->state->pendingControls_;
++		src_->state->pendingControls_.clear();
++	}
++	req->controls() = controls;
++
++	cam_->queueRequest(req);
+ 
+ 	{
+ 		GLibLocker locker(&lock_);
+@@ -234,6 +262,20 @@ GstLibcameraSrcState::requestCompleted(Request *request)
+ 		return;
+ 	}
+ 
++
++	/* Update the properties from the libcamera metadata */
++	const auto BlackLevelEnable = request->metadata().get(controls::draft::BlackLevelCorrectionEnable);
++	if (BlackLevelEnable) {
++		src_->ctrl.black_level_enable = *BlackLevelEnable;
++	}
++	/* Update the properties from the libcamera metadata */
++	const auto BlackLevel = request->metadata().get(controls::draft::BlackLevelCorrectionLevels);
++	if (BlackLevel) {
++		src_->ctrl.black_level_values[0] = (*BlackLevel)[0];
++		src_->ctrl.black_level_values[1] = (*BlackLevel)[1];
++		src_->ctrl.black_level_values[2] = (*BlackLevel)[2];
++	}
++
+ 	if (GST_ELEMENT_CLOCK(src_)) {
+ 		int64_t timestamp = request->metadata().get(controls::SensorTimestamp).value_or(0);
+ 
+@@ -669,6 +711,7 @@ gst_libcamera_src_task_enter(GstTask *task, [[maybe_unused]] GThread *thread,
+ 		}
+ 	}
+ 
++	/* Note: controls provided at start() are dropped by IPA */
+ 	ret = state->cam_->start(&state->initControls_);
+ 	if (ret) {
+ 		GST_ELEMENT_ERROR(self, RESOURCE, SETTINGS,
+@@ -730,6 +773,7 @@ gst_libcamera_src_set_property(GObject *object, guint prop_id,
+ {
+ 	GLibLocker lock(GST_OBJECT(object));
+ 	GstLibcameraSrc *self = GST_LIBCAMERA_SRC(object);
++	GstLibcameraSrcState *state = self->state;
+ 
+ 	switch (prop_id) {
+ 	case PROP_CAMERA_NAME:
+@@ -739,6 +783,24 @@ gst_libcamera_src_set_property(GObject *object, guint prop_id,
+ 	case PROP_AUTO_FOCUS_MODE:
+ 		self->auto_focus_mode = static_cast<controls::AfModeEnum>(g_value_get_enum(value));
+ 		break;
++	case PROP_BLACK_LEVEL_ENABLE:
++	{
++		bool enable = g_value_get_boolean(value);
++		GLibLocker locker(&state->controlsLock_);
++		state->pendingControls_.set(controls::draft::BlackLevelCorrectionEnable,
++					    enable);
++		break;
++	}
++	case PROP_BLACK_LEVEL_VALUES:
++	{
++		int blR = g_value_get_int(gst_value_array_get_value(value, 0));
++		int blG = g_value_get_int(gst_value_array_get_value(value, 1));
++		int blB = g_value_get_int(gst_value_array_get_value(value, 2));
++		GLibLocker locker(&state->controlsLock_);
++		state->pendingControls_.set(controls::draft::BlackLevelCorrectionLevels,
++					    { blR, blG, blB });
++		break;
++	}
+ 	default:
+ 		G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
+ 		break;
+@@ -759,6 +821,21 @@ gst_libcamera_src_get_property(GObject *object, guint prop_id, GValue *value,
+ 	case PROP_AUTO_FOCUS_MODE:
+ 		g_value_set_enum(value, static_cast<gint>(self->auto_focus_mode));
+ 		break;
++	case PROP_BLACK_LEVEL_ENABLE:
++		g_value_set_boolean(value, self->ctrl.black_level_enable);
++		break;
++	case PROP_BLACK_LEVEL_VALUES:
++	{
++		GValue val = G_VALUE_INIT;
++		g_value_reset (value);
++		g_value_init (&val, G_TYPE_INT);
++		for (guint i = 0; i < 3; ++i) {
++			g_value_set_int(&val, self->ctrl.black_level_values[i]);
++			gst_value_array_append_value(value, &val);
++		}
++		g_value_unset (&val);
++		break;
++	}
+ 	default:
+ 		G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
+ 		break;
+@@ -844,6 +921,7 @@ gst_libcamera_src_finalize(GObject *object)
+ 	g_rec_mutex_clear(&self->stream_lock);
+ 	g_clear_object(&self->task);
+ 	g_mutex_clear(&self->state->lock_);
++	g_mutex_clear(&self->state->controlsLock_);
+ 	g_free(self->camera_name);
+ 	delete self->state;
+ 
+@@ -863,9 +941,12 @@ gst_libcamera_src_init(GstLibcameraSrc *self)
+ 	gst_task_set_lock(self->task, &self->stream_lock);
+ 
+ 	g_mutex_init(&state->lock_);
++	g_mutex_init(&state->controlsLock_);
+ 
+-	state->srcpads_.push_back(gst_pad_new_from_template(templ, "src"));
+-	gst_element_add_pad(GST_ELEMENT(self), state->srcpads_.back());
++	GstPad *pad = gst_pad_new_from_template(templ, "src");
++	state->srcpads_.push_back(pad);
++	gst_element_add_pad(GST_ELEMENT(self), pad);
++	gst_child_proxy_child_added(GST_CHILD_PROXY(self), G_OBJECT(pad), GST_OBJECT_NAME(pad));
+ 
+ 	GST_OBJECT_FLAG_SET(self, GST_ELEMENT_FLAG_SOURCE);
+ 
+@@ -896,6 +977,8 @@ gst_libcamera_src_request_new_pad(GstElement *element, GstPadTemplate *templ,
+ 		return NULL;
+ 	}
+ 
++	gst_child_proxy_child_added(GST_CHILD_PROXY(self), G_OBJECT(pad), GST_OBJECT_NAME(pad));
++
+ 	return reinterpret_cast<GstPad *>(g_steal_pointer(&pad));
+ }
+ 
+@@ -904,6 +987,8 @@ gst_libcamera_src_release_pad(GstElement *element, GstPad *pad)
+ {
+ 	GstLibcameraSrc *self = GST_LIBCAMERA_SRC(element);
+ 
++	gst_child_proxy_child_removed(GST_CHILD_PROXY(self), G_OBJECT(pad), GST_OBJECT_NAME(pad));
++
+ 	GST_DEBUG_OBJECT(self, "Pad %" GST_PTR_FORMAT " being released", pad);
+ 
+ 	{
+@@ -963,4 +1048,52 @@ gst_libcamera_src_class_init(GstLibcameraSrcClass *klass)
+ 				 static_cast<gint>(controls::AfModeManual),
+ 				 G_PARAM_WRITABLE);
+ 	g_object_class_install_property(object_class, PROP_AUTO_FOCUS_MODE, spec);
++
++	/* Add ISP properties */
++	/* Black level enable property */
++	spec = g_param_spec_boolean("black-level-enable",
++				    "Black level enable",
++				    "ISP Black Level correction bloc activation",
++				    false,
++				    G_PARAM_READWRITE);
++	g_object_class_install_property(object_class, PROP_BLACK_LEVEL_ENABLE, spec);
++	/* Black level values property */
++	spec = gst_param_spec_array("black-level-values",
++				    "Black level RGB values",
++				    "ISP Black Level correction values ('<R, G, B>')",
++				    g_param_spec_int ("black-level-value", "Black level value",
++						      "One of R, G, B value.", 0, 255, 0,
++						      G_PARAM_READWRITE),
++				    G_PARAM_READWRITE);
++	g_object_class_install_property(object_class, PROP_BLACK_LEVEL_VALUES, spec);
++}
++
++/* GstChildProxy implementation */
++static GObject *
++gst_libcamera_src_child_proxy_get_child_by_index(GstChildProxy * child_proxy,
++						 guint index)
++{
++	GLibLocker lock(GST_OBJECT(child_proxy));
++	GObject *obj = nullptr;
++
++	obj = reinterpret_cast<GObject*>(g_list_nth_data(GST_ELEMENT(child_proxy)->srcpads, index));
++	if (obj)
++		gst_object_ref(obj);
++
++	return obj;
++}
++
++static guint
++gst_libcamera_src_child_proxy_get_children_count(GstChildProxy * child_proxy)
++{
++	GLibLocker lock(GST_OBJECT(child_proxy));
++	return GST_ELEMENT_CAST(child_proxy)->numsrcpads;
++}
++
++static void
++gst_libcamera_src_child_proxy_init(gpointer g_iface, [[maybe_unused]] gpointer iface_data)
++{
++  GstChildProxyInterface *iface = reinterpret_cast<GstChildProxyInterface *>(g_iface);
++  iface->get_child_by_index = gst_libcamera_src_child_proxy_get_child_by_index;
++  iface->get_children_count = gst_libcamera_src_child_proxy_get_children_count;
+ }
+diff --git a/src/ipa/dcmipp/algorithms/aec.cpp b/src/ipa/dcmipp/algorithms/aec.cpp
+new file mode 100644
+index 00000000..110bb6fd
+--- /dev/null
++++ b/src/ipa/dcmipp/algorithms/aec.cpp
+@@ -0,0 +1,221 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++/*
++ * Copyright (C) 2024 ST Microelectronics
++ *
++ * aec.cpp - STM32 DCMIPP AE control
++ */
++
++#include "aec.h"
++
++#include <libcamera/base/log.h>
++#include <libcamera/control_ids.h>
++
++namespace libcamera {
++
++namespace ipa::dcmipp::algorithms {
++
++LOG_DEFINE_CATEGORY(DcmippAec)
++
++int Aec::init([[maybe_unused]] IPAContext &context, const YamlObject &tuningData)
++{
++	/* Check for AEC algo config  */
++	params_.algoEnable = tuningData["AeEnable"].get<bool>(0);
++	params_.algoTarget = tuningData["AeTarget"].get<uint32_t>(0);
++
++	/* Check for sensor static config (exposure time in microseconds, gain in dB) */
++	params_.sensorStatic.exposure = tuningData["ExposureTime"].get<int32_t>(10000);
++	params_.sensorStatic.gain = tuningData["AnalogueGain_dB"].get<double>(1);
++
++	return 0;
++}
++
++int Aec::configure(IPAContext &context,
++		   [[maybe_unused]] const IPACameraSensorInfo &configInfo)
++{
++	/* Set the initial ISP/sensor values in the pending config */
++	if (params_.algoEnable) {
++		/* Start with gain=min and exposure = max */
++		config_.sensor.gain = context.info.sensorGainMin;
++		config_.sensor.exposure = context.info.sensorExposureMax;
++	} else {
++		/* Static config */
++		config_.sensor = params_.sensorStatic;
++	}
++
++	config_.pending = true;
++
++	return 0;
++}
++
++void Aec::queueRequest([[maybe_unused]] IPAContext &context,
++		       [[maybe_unused]] const uint32_t frame,
++		       [[maybe_unused]] IPAFrameContext &frameContext,
++		       const ControlList &controls)
++{
++	/* Algo ctrl: only update params_ which will be considered upon the next process() call */
++	const auto &algoEnable = controls.get(controls::AeEnable);
++	const auto &algoTarget = controls.get(controls::draft::AeExposureTarget);
++
++	if (algoEnable) {
++		params_.algoEnable = *algoEnable;
++		LOG(DcmippAec, Debug) << "Updating AeEnable to " << *algoEnable;
++	}
++
++	if (algoTarget) {
++		params_.algoTarget = *algoTarget;
++		LOG(DcmippAec, Debug) << "Updating AeTarget to " << *algoTarget;
++	}
++
++	/* Static config: update params_ and if applicable force config_ update now */
++	const auto &gain = controls.get(controls::draft::AnalogueGain_dB);
++	const auto &exposure = controls.get(controls::ExposureTime);
++
++	if (gain) {
++		params_.sensorStatic.gain = *gain;
++		if (!params_.algoEnable) {
++			config_.sensor.gain = params_.sensorStatic.gain;
++			config_.pending = true;
++		}
++		LOG(DcmippAec, Debug) << "Updating static sensor gain to " << *gain;
++	}
++
++	if (exposure) {
++		params_.sensorStatic.exposure = *exposure;
++		if (!params_.algoEnable) {
++			config_.sensor.exposure = *exposure;
++			config_.pending = true;
++		}
++		LOG(DcmippAec, Debug) << "Updating static sensor exposure to " << *exposure;
++	}
++}
++
++void Aec::prepare(IPAContext &context,
++		  [[maybe_unused]] const uint32_t frame,
++		  [[maybe_unused]] IPAFrameContext &frameContext,
++		  [[maybe_unused]] stm32_dcmipp_params_cfg *params,
++		  ControlList &sensorControls,
++		  [[maybe_unused]] ControlList &ispControls)
++{
++	/* Copy the pending config to the isp_params and sensor_ctrl. Update the IPAContext */
++	if (config_.pending) {
++		/* Configure sensor controls */
++		sensorControls.set(controls::draft::AnalogueGain_dB, config_.sensor.gain);
++		sensorControls.set(controls::ExposureTime, config_.sensor.exposure);
++
++		/* Update context */
++		context.sensor = config_.sensor;
++
++		/* Start the invalid stats counter from this update. Consider both ISP and sensor */
++		internal_.invalidStats = context.info.ispStatLatency + context.info.sensorStatLatency;
++
++		/* Clear the pending request */
++		config_.pending = false;
++	}
++}
++
++const int32_t kAecTolerance = 15;
++const float kAecCoeffLumGain = 0.1f;
++const float kAecGainUpdateMax = 5.0f;
++const float kAecExposureUpdateRatio = 1.2f;
++const int32_t kAecExposureMin = 400;
++
++void Aec::process(IPAContext &context,
++		  [[maybe_unused]] const uint32_t frame,
++		  [[maybe_unused]] IPAFrameContext &frameContext,
++		  const stm32_dcmipp_stat_buf *stats,
++		  ControlList &metadata)
++{
++	/* Compute a new pending config from stats */
++	if (params_.algoEnable) {
++		/* Check if stats can be considered as valid */
++		if (internal_.invalidStats)
++			internal_.invalidStats--;
++
++		if (internal_.invalidStats) {
++			LOG(DcmippAec, Debug) << "Can't update now";
++		} else {
++			bool do_exposure_update;
++			float gain_update;
++			double gain = context.sensor.gain;
++			int32_t exposure = context.sensor.exposure;
++			int32_t target = (int32_t)params_.algoTarget;
++			int32_t avgL = (3 * stats->post.average_RGB[0] +
++					6 * stats->post.average_RGB[1] +
++					1 * stats->post.average_RGB[2]) /
++				       10;
++
++			LOG(DcmippAec, Debug) << "Status: L = " << avgL << " - "
++					      << "Gain = " << gain << " db - "
++					      << "Exposure = " << exposure << " us";
++
++			/* Compare the average luminance with the target */
++			gain_update = 0.0f;
++			if (avgL > target + kAecTolerance) {
++				/* Too bright, decrease gain */
++				gain_update = (float)(target - avgL) * kAecCoeffLumGain;
++				if (gain_update < -kAecGainUpdateMax)
++					gain_update = -kAecGainUpdateMax;
++			} else if (avgL < target - kAecTolerance) {
++				/* Too dark vador, call a Jedi and increase gain */
++				gain_update = (float)(target - avgL) * kAecCoeffLumGain;
++				if (gain_update > kAecGainUpdateMax)
++					gain_update = kAecGainUpdateMax;
++			}
++
++			if (gain_update == 0.0f) {
++				LOG(DcmippAec, Debug) << "No change required";
++			} else {
++				/* Need to change something (gain or exposure) */
++				/* Check current exposure to decide whether we shall update gain or exposure */
++				if ((gain == context.info.sensorGainMin) &&
++				    ((exposure != context.info.sensorExposureMax) || (gain_update < 0)))
++					do_exposure_update = true;
++				else
++					do_exposure_update = false;
++
++				if (!do_exposure_update) {
++					/* Update gain as it has not reached its min value */
++					gain += gain_update;
++					if (gain < context.info.sensorGainMin)
++						gain = context.info.sensorGainMin;
++					else if (gain > context.info.sensorGainMax)
++						gain = context.info.sensorGainMax;
++
++					LOG(DcmippAec, Debug) << "New gain: " << gain << " db";
++					config_.sensor.gain = gain;
++					config_.pending = true;
++				} else {
++					/* Update exposure since gain has reached its min value */
++					if (gain_update < 0) {
++						/* Decrease exposure */
++						exposure /= kAecExposureUpdateRatio;
++						/* Note: sensorExposureMin for IMX335 is wrong: use alternate value */
++						if (exposure < kAecExposureMin)
++							exposure = kAecExposureMin;
++					} else {
++						/* Increase exposure */
++						exposure *= kAecExposureUpdateRatio;
++						if (exposure > context.info.sensorExposureMax)
++							exposure = context.info.sensorExposureMax;
++					}
++
++					LOG(DcmippAec, Debug) << "New exposure: " << exposure << " us";
++					config_.sensor.exposure = exposure;
++					config_.pending = true;
++				}
++			}
++		}
++	}
++
++	/* Set metadata */
++	metadata.set(controls::AeEnable, params_.algoEnable);
++	metadata.set(controls::draft::AeExposureTarget, params_.algoTarget);
++	metadata.set(controls::draft::AnalogueGain_dB, (float)config_.sensor.gain);
++	metadata.set(controls::ExposureTime, config_.sensor.exposure);
++}
++
++REGISTER_IPA_ALGORITHM(Aec, "Aec")
++
++} /* namespace ipa::dcmipp::algorithms */
++
++} /* namespace libcamera */
+diff --git a/src/ipa/dcmipp/algorithms/aec.h b/src/ipa/dcmipp/algorithms/aec.h
+new file mode 100644
+index 00000000..1e1d86ef
+--- /dev/null
++++ b/src/ipa/dcmipp/algorithms/aec.h
+@@ -0,0 +1,50 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++/*
++ * Copyright (C) 2024 ST Microelectronics
++ *
++ * aec.h - STM32 DCMIPP AE control
++ */
++
++#pragma once
++
++#include "algorithm.h"
++
++namespace libcamera {
++
++namespace ipa::dcmipp::algorithms {
++
++class Aec : public Algorithm
++{
++public:
++	Aec() = default;
++
++	int init(IPAContext &context, const YamlObject &tuningData) override;
++	int configure(IPAContext &context, const IPACameraSensorInfo &configInfo) override;
++	void queueRequest(IPAContext &context, const uint32_t frame, IPAFrameContext &frameContext,
++			  const ControlList &controls) override;
++	void prepare(IPAContext &context, const uint32_t frame, IPAFrameContext &frameContext,
++		     stm32_dcmipp_params_cfg *params, ControlList &sensorControls,
++		     ControlList &ispControls) override;
++	void process(IPAContext &context, const uint32_t frame, IPAFrameContext &frameContext,
++		     const stm32_dcmipp_stat_buf *stats, ControlList &metadata) override;
++
++private:
++	struct algoParams {
++		bool algoEnable;
++		uint32_t algoTarget;
++		struct IPASensor sensorStatic;
++	} params_;
++
++	struct algoInternal {
++		int32_t invalidStats;
++	} internal_;
++
++	struct algoConfig {
++		bool pending;
++		struct IPASensor sensor;
++	} config_;
++};
++
++} /* namespace ipa::dcmipp::algorithms */
++
++} /* namespace libcamera */
+diff --git a/src/ipa/dcmipp/algorithms/algorithm.h b/src/ipa/dcmipp/algorithms/algorithm.h
+new file mode 100644
+index 00000000..8c59ceb0
+--- /dev/null
++++ b/src/ipa/dcmipp/algorithms/algorithm.h
+@@ -0,0 +1,35 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++/*
++ * Copyright (C) 2024 ST Microelectronics
++ *
++ * algorithm.h - STM32 DCMIPP control algorithm interface
++ */
++
++#pragma once
++
++#include <libipa/algorithm.h>
++
++#include "../module.h"
++
++namespace libcamera {
++
++namespace ipa::dcmipp {
++
++class Algorithm : public libcamera::ipa::Algorithm<Module>
++{
++	using libcamera::ipa::Algorithm<Module>::prepare;
++public:
++	/* prepare ISP params / controls and Sensor controls */
++	virtual void prepare([[maybe_unused]] typename Module::Context &context,
++			     [[maybe_unused]] const uint32_t frame,
++			     [[maybe_unused]] typename Module::FrameContext &frameContext,
++			     [[maybe_unused]] typename Module::Params *params,
++			     [[maybe_unused]] ControlList &sensorControls,
++			     [[maybe_unused]] ControlList &ispControls)
++	{
++	}
++};
++
++} /* namespace ipa::dcmipp */
++
++} /* namespace libcamera */
+diff --git a/src/ipa/dcmipp/algorithms/awb.cpp b/src/ipa/dcmipp/algorithms/awb.cpp
+new file mode 100644
+index 00000000..c8fbb4c1
+--- /dev/null
++++ b/src/ipa/dcmipp/algorithms/awb.cpp
+@@ -0,0 +1,492 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++/*
++ * Copyright (C) 2024 ST Microelectronics
++ *
++ * awb.cpp - STM32 DCMIPP AWB control
++ */
++
++#include "awb.h"
++
++#include <cmath>
++#include <limits.h>
++
++#include <libcamera/base/log.h>
++#include <libcamera/control_ids.h>
++
++namespace libcamera {
++
++namespace ipa::dcmipp::algorithms {
++
++LOG_DEFINE_CATEGORY(DcmippAwb)
++
++static constexpr uint32_t kPrecisionFactor = 100000000;
++static constexpr uint32_t kIdle = 128;
++static constexpr char kDelimiter = '$';
++
++static void toShiftMultiplier(uint32_t gain, uint8_t *shift, uint8_t *multiplier)
++{
++	/* Convert gain (Unit = 100000000 for "x1.0") to Multiplier (where 128 means "x1.0") */
++	uint64_t mult64 = gain;
++	mult64 = (mult64 * kIdle) / kPrecisionFactor;
++
++	/* Get Shift + Multiplier where Multiplier < 256 */
++	*shift = 0;
++	while (mult64 >= 256) {
++		mult64 /= 2;
++		(*shift)++;
++	}
++	*multiplier = (uint8_t)mult64;
++}
++
++static int16_t toCConvReg(int32_t coeff)
++{
++	/* Convert coefficient (Unit = 100000000 for "x1.0") to register format */
++	int64_t val = coeff;
++	int16_t reg;
++
++	val = (val * 256) / kPrecisionFactor;
++	if (val >= 0)
++		reg = val;
++	else
++		reg = ((-val ^ 0x7FF) + 1) & 0x7FF;
++
++	return reg;
++}
++
++static void getStatNoGain(struct IPAIspGain ispGain, const __u32 average_RGB[3],
++			  int32_t avgBeforeGain[3])
++{
++	uint64_t R, G, B;
++
++	/* Read the current ISP gain */
++	if (ispGain.enable == 1) {
++		R = ((uint64_t)average_RGB[0] * kPrecisionFactor) / ispGain.gainR;
++		avgBeforeGain[0] = (int32_t)R;
++
++		G = ((uint64_t)average_RGB[1] * kPrecisionFactor) / ispGain.gainG;
++		avgBeforeGain[1] = (int32_t)G;
++
++		B = ((uint64_t)average_RGB[2] * kPrecisionFactor) / ispGain.gainB;
++		avgBeforeGain[2] = (int32_t)B;
++	} else {
++		avgBeforeGain[0] = (int32_t)average_RGB[0];
++		avgBeforeGain[1] = (int32_t)average_RGB[1];
++		avgBeforeGain[2] = (int32_t)average_RGB[2];
++	}
++}
++
++static double linearSrgb(double c)
++{
++	double linh;
++	if (c <= 0.04045)
++		linh = c / 12.92;
++	else
++		linh = pow((c + 0.055) / 1.055, 2.4);
++	return linh;
++}
++
++static double computeCCT(int32_t gain[3])
++{
++	/* Correlation matrix used in order to convert RBG values to XYZ space */
++	/* Illuminant = D65      RGB (R709) [sRGB or HDTV] to XYZ */
++	const double Cx[] = { 0.4124, 0.3576, 0.1805 };
++	const double Cy[] = { 0.2126, 0.7152, 0.0722 };
++	const double Cz[] = { 0.0193, 0.1192, 0.9505 };
++	int i;
++	double data[3], xyNormFactor, m_xNormCoeff, m_yNormCoeff, nCoeff, cct;
++	double X_tmp = 0, Y_tmp = 0, Z_tmp = 0;
++
++	/* Normalize and prepare RGB channels values for cct computation */
++	data[0] = linearSrgb(gain[0] / 255.0);
++	data[1] = linearSrgb(gain[1] / 255.0);
++	data[2] = linearSrgb(gain[2] / 255.0);
++
++	/* Apply correlation matrix to RGB channels to obtain (X,Y,Z) */
++	for (i = 0; i < 3; i++) {
++		X_tmp += Cx[i] * data[i];
++		Y_tmp += Cy[i] * data[i];
++		Z_tmp += Cz[i] * data[i];
++	}
++
++	/* Transform (X,Y,Z) to (x,y) */
++	xyNormFactor = X_tmp + Y_tmp + Z_tmp;
++	m_xNormCoeff = X_tmp / xyNormFactor;
++	m_yNormCoeff = Y_tmp / xyNormFactor;
++
++	/* Apply McCamy's formula to obtain CCT value */
++	nCoeff = (m_xNormCoeff - 0.3320) / (0.1858 - m_yNormCoeff);
++	cct = (449 * pow(nCoeff, 3) + 3525 * pow(nCoeff, 2) + 6823.3 * nCoeff + 5520.33);
++
++	return cct;
++}
++
++static double fixCCT(double cct)
++{
++	/* Correction = 0.0005517 CCT² – 4.597 CCT + 12208 */
++	return 0.0005517 * cct * cct - 4.597 * cct + 12208;
++}
++
++void Awb::applyProfile(int profId)
++{
++	LOG(DcmippAwb, Debug) << "Changing AWB profile to " << params_.profileName[profId]
++			      << " (" << params_.referenceColorTemp[profId] << ")";
++	internal_.colorTemp = params_.referenceColorTemp[profId];
++
++	config_.gain.enable = 1;
++	config_.gain.gainR = params_.gainRGB[profId + 0 * kAwbNbRef];
++	config_.gain.gainG = params_.gainRGB[profId + 1 * kAwbNbRef];
++	config_.gain.gainB = params_.gainRGB[profId + 2 * kAwbNbRef];
++
++	config_.cconv.enable = 1;
++	int offset = 3 * 3 * profId;
++	std::copy(params_.cconv.begin() + offset, params_.cconv.begin() + offset + 3 * 3,
++		  &config_.cconv.coeff[0][0]);
++
++	config_.pending = true;
++}
++
++int Awb::init([[maybe_unused]] IPAContext &context, const YamlObject &tuningData)
++{
++	/* Check for AWB algo config  */
++	params_.algoEnable = tuningData["AwbEnable"].get<bool>(0);
++
++	std::vector<std::string> name = tuningData["ProfileName"].getList<std::string>().value_or(std::vector<std::string>{});
++	if (name.size() == kAwbNbRef) {
++		std::copy(name.begin(), name.end(), params_.profileName.begin());
++	} else if (name.size() != 0) {
++		LOG(DcmippAwb, Error) << "Invalid ProfileName";
++		return -EINVAL;
++	}
++
++	std::vector<int32_t> data = tuningData["RefColorTemp"].getList<int32_t>().value_or(std::vector<int32_t>{});
++	if (data.size() == kAwbNbRef) {
++		std::copy(data.begin(), data.end(), params_.referenceColorTemp.begin());
++	} else if (data.size() != 0) {
++		LOG(DcmippAwb, Error) << "Invalid RefColorTemp";
++		return -EINVAL;
++	}
++
++	std::vector<int32_t> dataR = tuningData["GainR"].getList<int32_t>().value_or(std::vector<int32_t>{});
++	std::vector<int32_t> dataG = tuningData["GainG"].getList<int32_t>().value_or(std::vector<int32_t>{});
++	std::vector<int32_t> dataB = tuningData["GainB"].getList<int32_t>().value_or(std::vector<int32_t>{});
++	if ((dataR.size() == kAwbNbRef) && (dataG.size() == kAwbNbRef) && (dataB.size() == kAwbNbRef)) {
++		std::copy(dataR.begin(), dataR.end(), params_.gainRGB.begin() + 0 * dataR.size());
++		std::copy(dataG.begin(), dataG.end(), params_.gainRGB.begin() + 1 * dataR.size());
++		std::copy(dataB.begin(), dataB.end(), params_.gainRGB.begin() + 2 * dataR.size());
++	} else if ((dataR.size() != 0) || (dataG.size() != 0) || (dataB.size() != 0)) {
++		LOG(DcmippAwb, Error) << "Invalid GainR/G/B";
++		return -EINVAL;
++	}
++
++	std::vector<int32_t> matrix = tuningData["Cconv"].getList<int32_t>().value_or(std::vector<int32_t>{});
++	if (matrix.size() == kAwbNbRef * 3 * 3) {
++		std::copy(matrix.begin(), matrix.end(), params_.cconv.begin());
++	} else if (matrix.size() != 0) {
++		LOG(DcmippAwb, Error) << "Invalid Cconv";
++		return -EINVAL;
++	}
++
++	/* Check for ISP Gain / ColorConv static config */
++	params_.gainStatic.gainR = tuningData["FixedGainR"].get<int32_t>(0);
++	params_.gainStatic.gainG = tuningData["FixedGainG"].get<int32_t>(0);
++	params_.gainStatic.gainB = tuningData["FixedGainB"].get<int32_t>(0);
++	if (!params_.gainStatic.gainR && !params_.gainStatic.gainG && !params_.gainStatic.gainB) {
++		params_.gainStatic.enable = false;
++	} else {
++		params_.gainStatic.enable = tuningData["FixedGainEnable"].get<bool>(true);
++	}
++
++	matrix = tuningData["FixedCconv"].getList<int32_t>().value_or(std::vector<int32_t>{});
++	if (!matrix.size()) {
++		memset(params_.cconvStatic.coeff, 0, sizeof(params_.cconvStatic.coeff));
++		params_.cconvStatic.enable = false;
++	} else if (matrix.size() == 3 * 3) {
++		for (unsigned int i = 0; i < 3; i++)
++			for (unsigned int j = 0; j < 3; j++)
++				params_.cconvStatic.coeff[i][j] = matrix[i * 3 + j];
++		params_.cconvStatic.enable = tuningData["FixedCconvEnable"].get<bool>(true);
++	} else {
++		LOG(DcmippAwb, Error) << "Invalid FixedCconv";
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++int Awb::configure([[maybe_unused]] IPAContext &context,
++		   [[maybe_unused]] const IPACameraSensorInfo &configInfo)
++{
++	/* Set the initial ISP values in the pending config */
++	if (!params_.algoEnable) {
++		/* Apply static ISP Gain / ColorConv config */
++		config_.gain = params_.gainStatic;
++		config_.cconv = params_.cconvStatic;
++	}
++
++	config_.pending = true;
++
++	return 0;
++}
++
++void Awb::queueRequest([[maybe_unused]] IPAContext &context,
++		       [[maybe_unused]] const uint32_t frame,
++		       [[maybe_unused]] IPAFrameContext &frameContext,
++		       const ControlList &controls)
++{
++	bool awbModeAutoDisabling = false;
++
++	/* Algo ctrl: only update params_ which will be considered upon the next process() call */
++	const auto &algoEnable = controls.get(controls::AwbEnable);
++	const auto &awbMode = controls.get(controls::AwbMode);
++	const auto &profileName = controls.get(controls::draft::AwbProfileName);
++	const auto &referenceColorTemp = controls.get(controls::draft::AwbReferenceColorTemperature);
++	const auto &gainRGB = controls.get(controls::draft::AwbColourGains3);
++	const auto &cconv = controls.get(controls::draft::AwbColourCorrection);
++
++	if (algoEnable) {
++		params_.algoEnable = *algoEnable;
++		LOG(DcmippAwb, Debug) << "Updating AwbEnable to " << *algoEnable;
++	}
++
++	if (awbMode) {
++		if (*awbMode == controls::AwbAuto) {
++			params_.algoEnable = true;
++			LOG(DcmippAwb, Debug) << "Updating AwbMode / AwbEnable to "
++					      << params_.algoEnable;
++		} else if (*awbMode == controls::AwbCustom) {
++			if (params_.algoEnable)
++				awbModeAutoDisabling = true;
++			params_.algoEnable = false;
++			LOG(DcmippAwb, Debug) << "Updating AwbMode / AwbEnable to "
++					      << params_.algoEnable;
++		} else {
++			LOG(DcmippAwb, Error) << "Unsupported AwbMode: " << *awbMode;
++		}
++	}
++
++	if (profileName) {
++		/* The Controls class does not support array of string. So, split the concatenated string */
++		std::string token;
++		std::stringstream ss(*profileName);
++		int i = 0;
++		while (getline(ss, token, kDelimiter) && i < kAwbNbRef)
++			params_.profileName[i++] = token;
++		LOG(DcmippAwb, Debug) << "Updating AwbProfileName to " << *profileName;
++	}
++
++	if (referenceColorTemp) {
++		std::copy(std::begin(*referenceColorTemp), std::end(*referenceColorTemp), params_.referenceColorTemp.begin());
++		LOG(DcmippAwb, Debug) << "Updating AwbRefColorTemp to " << (*referenceColorTemp)[0] << "...";
++	}
++
++	if (gainRGB) {
++		std::copy(std::begin(*gainRGB), std::end(*gainRGB), params_.gainRGB.begin());
++		LOG(DcmippAwb, Debug) << "Updating AwbColourGains3 to " << (*gainRGB)[0] << "...";
++	}
++
++	if (cconv) {
++		std::copy(std::begin(*cconv), std::end(*cconv), params_.cconv.begin());
++		LOG(DcmippAwb, Debug) << "Updating AwbColourConv to " << (*cconv)[0] << "...";
++	}
++
++	/* Static config: update params_ and if applicable force config_ update now */
++	const auto &customColorTemp = controls.get(controls::draft::AwbCustomColorTemperature);
++	const auto &staticGainEnable = controls.get(controls::draft::ColourGains3Enable);
++	const auto &staticGain = controls.get(controls::draft::ColourGains3);
++	const auto &staticCconvEnable = controls.get(controls::draft::ColourCorrectionEnable);
++	const auto &staticCconv = controls.get(controls::draft::ColourCorrection);
++
++	if (customColorTemp && !params_.algoEnable) {
++		/* Search for the corresponding profile and apply it */
++		int profId;
++		for (profId = 0; profId < kAwbNbRef; profId++)
++			if (params_.referenceColorTemp[profId] == *customColorTemp)
++				break;
++
++		if (profId >= kAwbNbRef) {
++			LOG(DcmippAwb, Error) << "Invalid Custom Colour Temp: " << *customColorTemp;
++			/* Revert the 'awbMode = AwbCustom' request if needed */
++			if (awbModeAutoDisabling)
++				params_.algoEnable = true;
++		} else {
++			applyProfile(profId);
++		}
++
++		internal_.customColorTemp = *customColorTemp;
++	}
++
++	if (staticGainEnable) {
++		params_.gainStatic.enable = *staticGainEnable;
++		if (!params_.algoEnable) {
++			config_.gain.enable = *staticGainEnable;
++			config_.pending = true;
++		}
++		LOG(DcmippAwb, Debug) << "Updating ColourGains3Enable to " << *staticGainEnable;
++	}
++
++	if (staticGain) {
++		params_.gainStatic.gainR = (*staticGain)[0];
++		params_.gainStatic.gainG = (*staticGain)[1];
++		params_.gainStatic.gainB = (*staticGain)[2];
++		if (!params_.algoEnable) {
++			config_.gain.gainR = (*staticGain)[0];
++			config_.gain.gainG = (*staticGain)[1];
++			config_.gain.gainB = (*staticGain)[2];
++			config_.pending = true;
++		}
++		LOG(DcmippAwb, Debug) << "Updating ColourGains3 to "
++				      << (*staticGain)[0] << " / "
++				      << (*staticGain)[1] << " / "
++				      << (*staticGain)[2];
++	}
++
++	if (staticCconvEnable) {
++		params_.cconvStatic.enable = *staticCconvEnable;
++		if (!params_.algoEnable) {
++			config_.cconv.enable = *staticCconvEnable;
++			config_.pending = true;
++		}
++		LOG(DcmippAwb, Debug) << "Updating ColourConvEnable to " << *staticCconvEnable;
++	}
++
++	if (staticCconv) {
++		for (unsigned int i = 0; i < 3; i++)
++			for (unsigned int j = 0; j < 3; j++)
++				params_.cconvStatic.coeff[i][j] = (*staticCconv)[i * 3 + j];
++		if (!params_.algoEnable) {
++			memcpy(config_.cconv.coeff, params_.cconvStatic.coeff, sizeof(config_.cconv.coeff));
++			config_.pending = true;
++		}
++		LOG(DcmippAwb, Debug) << "Updating ColourConv to " << (*staticCconv)[0] << "...";
++	}
++}
++
++void Awb::prepare(IPAContext &context,
++		  [[maybe_unused]] const uint32_t frame,
++		  [[maybe_unused]] IPAFrameContext &frameContext,
++		  stm32_dcmipp_params_cfg *params,
++		  [[maybe_unused]] ControlList &sensorControls,
++		  [[maybe_unused]] ControlList &ispControls)
++{
++	/* Copy the pending config to the isp_params. Update the IPAContext */
++	if (config_.pending) {
++		/* Configure Gain params */
++		params->module_cfg_update |= STM32_DCMIPP_ISP_EX;
++		toShiftMultiplier(config_.gain.gainR, &params->ctrls.ex_cfg.shift_r, &params->ctrls.ex_cfg.mult_r);
++		toShiftMultiplier(config_.gain.gainG, &params->ctrls.ex_cfg.shift_g, &params->ctrls.ex_cfg.mult_g);
++		toShiftMultiplier(config_.gain.gainB, &params->ctrls.ex_cfg.shift_b, &params->ctrls.ex_cfg.mult_b);
++		params->ctrls.ex_cfg.en = config_.gain.enable;
++
++		/* Configure Color Conv params */
++		params->module_cfg_update |= STM32_DCMIPP_ISP_CC;
++		params->ctrls.cc_cfg.ra = 0;
++		params->ctrls.cc_cfg.ga = 0;
++		params->ctrls.cc_cfg.ba = 0;
++		params->ctrls.cc_cfg.clamp = 0;
++		params->ctrls.cc_cfg.rr = toCConvReg(config_.cconv.coeff[0][0]);
++		params->ctrls.cc_cfg.rg = toCConvReg(config_.cconv.coeff[0][1]);
++		params->ctrls.cc_cfg.rb = toCConvReg(config_.cconv.coeff[0][2]);
++		params->ctrls.cc_cfg.gr = toCConvReg(config_.cconv.coeff[1][0]);
++		params->ctrls.cc_cfg.gg = toCConvReg(config_.cconv.coeff[1][1]);
++		params->ctrls.cc_cfg.gb = toCConvReg(config_.cconv.coeff[1][2]);
++		params->ctrls.cc_cfg.br = toCConvReg(config_.cconv.coeff[2][0]);
++		params->ctrls.cc_cfg.bg = toCConvReg(config_.cconv.coeff[2][1]);
++		params->ctrls.cc_cfg.bb = toCConvReg(config_.cconv.coeff[2][2]);
++		params->ctrls.cc_cfg.en = config_.cconv.enable;
++
++		/* Update context */
++		context.isp.gain = config_.gain;
++		context.isp.cconv = config_.cconv;
++
++		/* Start the invalid stats counter from this update. Consider only ISP, not sensor */
++		internal_.invalidStats = context.info.ispStatLatency;
++
++		/* Clear the pending request */
++		config_.pending = false;
++	}
++}
++
++void Awb::process(IPAContext &context,
++		  [[maybe_unused]] const uint32_t frame,
++		  [[maybe_unused]] IPAFrameContext &frameContext,
++		  const stm32_dcmipp_stat_buf *stats,
++		  ControlList &metadata)
++{
++	/* Compute a new pending config from stats */
++	if (params_.algoEnable) {
++		int32_t avgBeforeGain[3], fixedCCT, distance, colorTemp;
++		int i, profId;
++		double cct;
++
++		/* Check if stats can be considered as valid */
++		if (internal_.invalidStats)
++			internal_.invalidStats--;
++
++		if (!internal_.invalidStats) {
++			/* Get RGB before ISP gain */
++			getStatNoGain(context.isp.gain, stats->post.average_RGB, avgBeforeGain);
++
++			/* Get CCT from McCamy’s approximation */
++			cct = computeCCT(avgBeforeGain);
++
++			/* Fix the computed CCT to match IMX335 experimentations */
++			fixedCCT = (int32_t)fixCCT(cct);
++
++			/* Find the index of the closest profile matching this color temperature */
++			distance = INT_MAX;
++			profId = 0;
++			for (i = 0; i < kAwbNbRef; i++) {
++				if (params_.referenceColorTemp[i] == 0)
++					continue;
++
++				if (abs(params_.referenceColorTemp[i] - fixedCCT) < distance) {
++					distance = abs(params_.referenceColorTemp[i] - fixedCCT);
++					profId = i;
++				}
++			}
++
++			colorTemp = params_.referenceColorTemp[profId];
++			if (colorTemp != internal_.colorTemp)
++				applyProfile(profId);
++		}
++	}
++
++	/* Set metadata */
++	metadata.set(controls::draft::ColourGains3Enable, config_.gain.enable);
++	metadata.set(controls::draft::ColourGains3,
++		     { static_cast<int32_t>(config_.gain.gainR),
++		       static_cast<int32_t>(config_.gain.gainG),
++		       static_cast<int32_t>(config_.gain.gainB) });
++
++	metadata.set(controls::draft::ColourCorrectionEnable, config_.cconv.enable);
++	metadata.set(controls::draft::ColourCorrection,
++		     { config_.cconv.coeff[0][0], config_.cconv.coeff[0][1], config_.cconv.coeff[0][2],
++		       config_.cconv.coeff[1][0], config_.cconv.coeff[1][1], config_.cconv.coeff[1][2],
++		       config_.cconv.coeff[2][0], config_.cconv.coeff[2][1], config_.cconv.coeff[2][2] });
++
++	/* The Controls class does not support array of string. So, concatenate the strings in a single one */
++	std::string concatProfiles = "";
++	for (auto const &profile : params_.profileName) {
++		if (!concatProfiles.empty())
++			concatProfiles += kDelimiter;
++		concatProfiles += profile;
++	}
++	metadata.set(controls::draft::AwbProfileName, concatProfiles);
++
++	metadata.set(controls::AwbEnable, params_.algoEnable);
++	metadata.set(controls::AwbMode, params_.algoEnable ? controls::AwbAuto : controls::AwbCustom);
++	metadata.set(controls::draft::AwbReferenceColorTemperature, params_.referenceColorTemp);
++	metadata.set(controls::draft::AwbColourGains3, params_.gainRGB);
++	metadata.set(controls::draft::AwbColourCorrection, params_.cconv);
++
++	if (internal_.colorTemp)
++		metadata.set(controls::ColourTemperature, internal_.colorTemp);
++	if (internal_.customColorTemp && !params_.algoEnable)
++		metadata.set(controls::draft::AwbCustomColorTemperature, internal_.customColorTemp);
++}
++
++REGISTER_IPA_ALGORITHM(Awb, "Awb")
++
++} /* namespace ipa::dcmipp::algorithms */
++
++} /* namespace libcamera */
+diff --git a/src/ipa/dcmipp/algorithms/awb.h b/src/ipa/dcmipp/algorithms/awb.h
+new file mode 100644
+index 00000000..5ccf40da
+--- /dev/null
++++ b/src/ipa/dcmipp/algorithms/awb.h
+@@ -0,0 +1,61 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++/*
++ * Copyright (C) 2024 ST Microelectronics
++ *
++ * awb.h - STM32 DCMIPP AWB control
++ */
++
++#pragma once
++
++#include "algorithm.h"
++
++namespace libcamera {
++
++namespace ipa::dcmipp::algorithms {
++
++class Awb : public Algorithm
++{
++public:
++	Awb() = default;
++
++	int init(IPAContext &context, const YamlObject &tuningData) override;
++	int configure(IPAContext &context, const IPACameraSensorInfo &configInfo) override;
++	void queueRequest(IPAContext &context, const uint32_t frame, IPAFrameContext &frameContext,
++			  const ControlList &controls) override;
++	void prepare(IPAContext &context, const uint32_t frame, IPAFrameContext &frameContext,
++		     stm32_dcmipp_params_cfg *params, ControlList &sensorControls,
++		     ControlList &ispControls) override;
++	void process(IPAContext &context, const uint32_t frame, IPAFrameContext &frameContext,
++		     const stm32_dcmipp_stat_buf *stats, ControlList &metadata) override;
++
++private:
++	static constexpr int32_t kAwbNbRef = 5;
++
++	struct algoParams {
++		bool algoEnable;
++		std::array<std::string, kAwbNbRef> profileName;
++		std::array<int32_t, kAwbNbRef> referenceColorTemp;
++		std::array<int32_t, kAwbNbRef * 3> gainRGB;
++		std::array<int32_t, kAwbNbRef * 3 * 3> cconv;
++		struct IPAIspGain gainStatic;
++		struct IPAIspColorConv cconvStatic;
++	} params_;
++
++	struct algoInternal {
++		int32_t invalidStats;
++		int32_t colorTemp;
++		int32_t customColorTemp;
++	} internal_;
++
++	struct algoConfig {
++		bool pending;
++		struct IPAIspGain gain;
++		struct IPAIspColorConv cconv;
++	} config_;
++
++	void applyProfile(int profId);
++};
++
++} /* namespace ipa::dcmipp::algorithms */
++
++} /* namespace libcamera */
+diff --git a/src/ipa/dcmipp/algorithms/badpixel.cpp b/src/ipa/dcmipp/algorithms/badpixel.cpp
+new file mode 100644
+index 00000000..5d0e90b3
+--- /dev/null
++++ b/src/ipa/dcmipp/algorithms/badpixel.cpp
+@@ -0,0 +1,148 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++/*
++ * Copyright (C) 2024 ST Microelectronics
++ *
++ * badpixel.cpp - STM32 DCMIPP Bad Pixel Removal
++ */
++
++#include "badpixel.h"
++
++#include <libcamera/base/log.h>
++#include <libcamera/control_ids.h>
++
++namespace libcamera {
++
++namespace ipa::dcmipp::algorithms {
++
++LOG_DEFINE_CATEGORY(DcmippBadPixel)
++
++int BadPixel::init([[maybe_unused]] IPAContext &context, const YamlObject &tuningData)
++{
++	/* Parse Tuning Data to get algo parameters */
++	int8_t strength = tuningData["Strength"].get<int8_t>(-1);
++	int32_t threshold = tuningData["Threshold"].get<int32_t>(0);
++	if (strength < 0 && !threshold) {
++		internal_.threshold = 0;
++		params_.badpixel.strength = 0;
++		params_.badpixel.enable = false;
++	} else {
++		internal_.threshold = threshold;
++		internal_.countAccu = 0;
++		internal_.measureNb = 0;
++		params_.badpixel.strength = strength < 0 ? 0 : strength;
++		params_.badpixel.enable = tuningData["Enable"].get<bool>(true);
++	}
++
++	return 0;
++}
++
++int BadPixel::configure([[maybe_unused]] IPAContext &context,
++			[[maybe_unused]] const IPACameraSensorInfo &configInfo)
++{
++	/* Set the initial ISP values in the pending config */
++	config_.badpixel = params_.badpixel;
++	config_.pending = true;
++
++	return 0;
++}
++
++void BadPixel::queueRequest([[maybe_unused]] IPAContext &context,
++			    [[maybe_unused]] const uint32_t frame,
++			    [[maybe_unused]] IPAFrameContext &frameContext,
++			    const ControlList &controls)
++{
++	/* Algo ctrl: only update internal_ which will be considered upon the next process() call */
++	const auto &threshold = controls.get(controls::draft::BadPixelRemovalThreshold);
++	if (threshold) {
++		internal_.threshold = *threshold;
++		internal_.measureNb = 0;
++		internal_.countAccu = 0;
++		LOG(DcmippBadPixel, Debug) << "Updating threshold to " << *threshold;
++	}
++
++	/* Update params_ and force config_ update now */
++	const auto &enable = controls.get(controls::draft::BadPixelRemovalEnable);
++	const auto &strength = controls.get(controls::draft::BadPixelRemovalStrength);
++
++	if (enable) {
++		params_.badpixel.enable = *enable;
++		config_.badpixel.enable = params_.badpixel.enable;
++		config_.pending = true;
++		LOG(DcmippBadPixel, Debug) << "Updating Bad Pixel status to " << *enable;
++	}
++
++	if (strength) {
++		params_.badpixel.strength = *strength;
++		if (!internal_.threshold) {
++			config_.badpixel.strength = params_.badpixel.strength;
++			config_.pending = true;
++		}
++		LOG(DcmippBadPixel, Debug) << "Updating strength to " << *strength;
++	}
++}
++
++void BadPixel::prepare(IPAContext &context,
++		       [[maybe_unused]] const uint32_t frame,
++		       [[maybe_unused]] IPAFrameContext &frameContext,
++		       stm32_dcmipp_params_cfg *params,
++		       [[maybe_unused]] ControlList &sensorControls,
++		       [[maybe_unused]] ControlList &ispControls)
++{
++	/* Copy the pending config to the isp_params. Update the IPAContext */
++	if (config_.pending) {
++		/* Configure Bad Pixel params */
++		params->module_cfg_update |= STM32_DCMIPP_ISP_BPR;
++		params->ctrls.bpr_cfg.en = config_.badpixel.enable;
++		params->ctrls.bpr_cfg.strength = config_.badpixel.strength;
++
++		/* Update context */
++		context.isp.badpixel = config_.badpixel;
++
++		/* Clear the pending request */
++		config_.pending = false;
++	}
++}
++
++const int32_t kBadPixelMeasures = 30;
++const uint8_t kStrengthMax = 7;
++
++void BadPixel::process(IPAContext &context,
++		       [[maybe_unused]] const uint32_t frame,
++		       [[maybe_unused]] IPAFrameContext &frameContext,
++		       [[maybe_unused]] const stm32_dcmipp_stat_buf *stats,
++		       ControlList &metadata)
++{
++	/* Adjust strength according to threshold */
++	if (params_.badpixel.enable && internal_.threshold) {
++		/* Make kBadPixelMeasures measures before computing the average */
++		internal_.countAccu += stats->bad_pixel_count;
++		if (++internal_.measureNb == kBadPixelMeasures) {
++			uint8_t strength = context.isp.badpixel.strength;
++			internal_.countAccu /= kBadPixelMeasures;
++
++			/* Increase or decrease strength */
++			if (internal_.countAccu > internal_.threshold && strength > 0)
++				strength--;
++			else if (internal_.countAccu < internal_.threshold && strength < kStrengthMax - 1)
++				strength++;
++
++			/* Update config */
++			config_.badpixel.strength = strength;
++			config_.pending = true;
++			internal_.measureNb = 0;
++			internal_.countAccu = 0;
++		}
++	}
++
++	/* Set bad pixel metadata */
++	metadata.set(controls::draft::BadPixelRemovalEnable, config_.badpixel.enable);
++	metadata.set(controls::draft::BadPixelRemovalStrength, config_.badpixel.strength);
++	metadata.set(controls::draft::BadPixelRemovalThreshold, internal_.threshold);
++	metadata.set(controls::draft::BadPixelRemovalCount, stats->bad_pixel_count);
++}
++
++REGISTER_IPA_ALGORITHM(BadPixel, "BadPixel")
++
++} /* namespace ipa::dcmipp::algorithms */
++
++} /* namespace libcamera */
+diff --git a/src/ipa/dcmipp/algorithms/badpixel.h b/src/ipa/dcmipp/algorithms/badpixel.h
+new file mode 100644
+index 00000000..0db7645a
+--- /dev/null
++++ b/src/ipa/dcmipp/algorithms/badpixel.h
+@@ -0,0 +1,50 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++/*
++ * Copyright (C) 2024 ST Microelectronics
++ *
++ * badpixel.h - STM32 DCMIPP Bad Pixel Removal
++ */
++
++#pragma once
++
++#include "algorithm.h"
++
++namespace libcamera {
++
++namespace ipa::dcmipp::algorithms {
++
++class BadPixel : public Algorithm
++{
++public:
++	BadPixel() = default;
++
++	int init(IPAContext &context, const YamlObject &tuningData) override;
++	int configure(IPAContext &context, const IPACameraSensorInfo &configInfo) override;
++	void queueRequest(IPAContext &context, const uint32_t frame, IPAFrameContext &frameContext,
++			  const ControlList &controls) override;
++	void prepare(IPAContext &context, const uint32_t frame, IPAFrameContext &frameContext,
++		     stm32_dcmipp_params_cfg *params, ControlList &sensorControls,
++		     ControlList &ispControls) override;
++	void process(IPAContext &context, const uint32_t frame, IPAFrameContext &frameContext,
++		     const stm32_dcmipp_stat_buf *stats, ControlList &metadata) override;
++
++private:
++	struct algoParams {
++		struct IPAIspBadpixel badpixel;
++	} params_;
++
++	struct algoInternal {
++		int32_t threshold;
++		int32_t countAccu;
++		int32_t measureNb;
++	} internal_;
++
++	struct algoConfig {
++		bool pending;
++		struct IPAIspBadpixel badpixel;
++	} config_;
++};
++
++} /* namespace ipa::dcmipp::algorithms */
++
++} /* namespace libcamera */
+diff --git a/src/ipa/dcmipp/algorithms/blc.cpp b/src/ipa/dcmipp/algorithms/blc.cpp
+new file mode 100644
+index 00000000..68a33891
+--- /dev/null
++++ b/src/ipa/dcmipp/algorithms/blc.cpp
+@@ -0,0 +1,121 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++/*
++ * Copyright (C) 2024 ST Microelectronics
++ *
++ * blc.cpp - STM32 DCMIPP Black Level Correction
++ */
++
++#include "blc.h"
++
++#include <libcamera/base/log.h>
++#include <libcamera/control_ids.h>
++
++namespace libcamera {
++
++namespace ipa::dcmipp::algorithms {
++
++LOG_DEFINE_CATEGORY(DcmippBlc)
++
++int BlackLevelCorrection::init([[maybe_unused]] IPAContext &context, const YamlObject &tuningData)
++{
++	/* Parse Tuning Data to get algo parameters */
++	std::vector<int32_t> level = tuningData["Level"].getList<int32_t>().value_or(std::vector<int32_t>{});
++	if (!level.size()) {
++		params_.blackLevel.blcR = 0;
++		params_.blackLevel.blcG = 0;
++		params_.blackLevel.blcB = 0;
++		params_.blackLevel.enable = false;
++	} else if (level.size() == 3) {
++		params_.blackLevel.blcR = level[0];
++		params_.blackLevel.blcG = level[1];
++		params_.blackLevel.blcB = level[2];
++		params_.blackLevel.enable = false;
++		params_.blackLevel.enable = tuningData["Enable"].get<bool>(true);
++	} else {
++		LOG(DcmippBlc, Error) << "Invalid Levels";
++		return -EINVAL;
++	}
++	return 0;
++}
++
++int BlackLevelCorrection::configure([[maybe_unused]] IPAContext &context,
++				    [[maybe_unused]] const IPACameraSensorInfo &configInfo)
++{
++	/* Set the initial ISP/sensor values in the pending config */
++	config_.blackLevel = params_.blackLevel;
++	config_.pending = true;
++
++	return 0;
++}
++
++void BlackLevelCorrection::queueRequest([[maybe_unused]] IPAContext &context,
++					[[maybe_unused]] const uint32_t frame,
++					[[maybe_unused]] IPAFrameContext &frameContext,
++					const ControlList &controls)
++{
++	/* Update params_ and force config_ update now */
++	const auto &enable = controls.get(controls::draft::BlackLevelCorrectionEnable);
++	const auto &level = controls.get(controls::draft::BlackLevelCorrectionLevels);
++
++	if (enable) {
++		params_.blackLevel.enable = *enable;
++		config_.blackLevel.enable = params_.blackLevel.enable;
++		config_.pending = true;
++		LOG(DcmippBlc, Debug) << "Updating black level status to " << *enable;
++	}
++
++	if (level) {
++		params_.blackLevel.blcR = (*level)[0];
++		params_.blackLevel.blcG = (*level)[1];
++		params_.blackLevel.blcB = (*level)[2];
++		config_.blackLevel.blcR = params_.blackLevel.blcR;
++		config_.blackLevel.blcG = params_.blackLevel.blcG;
++		config_.blackLevel.blcB = params_.blackLevel.blcB;
++		config_.pending = true;
++		LOG(DcmippBlc, Debug) << "Updating black level to " << (*level)[0] << "...";
++	}
++}
++
++void BlackLevelCorrection::prepare([[maybe_unused]] IPAContext &context,
++				   [[maybe_unused]] const uint32_t frame,
++				   [[maybe_unused]] IPAFrameContext &frameContext,
++				   stm32_dcmipp_params_cfg *params,
++				   [[maybe_unused]] ControlList &sensorControls,
++				   [[maybe_unused]] ControlList &ispControls)
++{
++	/* Copy the pending config to the isp_params. Update the IPAContext */
++	if (config_.pending) {
++		/* Configure Black Level params */
++		params->module_cfg_update |= STM32_DCMIPP_ISP_BLC;
++		params->ctrls.blc_cfg.blc_r = config_.blackLevel.blcR;
++		params->ctrls.blc_cfg.blc_g = config_.blackLevel.blcG;
++		params->ctrls.blc_cfg.blc_b = config_.blackLevel.blcB;
++		params->ctrls.blc_cfg.en = config_.blackLevel.enable;
++
++		/* Update context */
++		context.isp.blackLevel = config_.blackLevel;
++
++		/* Clear the pending request */
++		config_.pending = false;
++	}
++}
++
++void BlackLevelCorrection::process([[maybe_unused]] IPAContext &context,
++				   [[maybe_unused]] const uint32_t frame,
++				   [[maybe_unused]] IPAFrameContext &frameContext,
++				   [[maybe_unused]] const stm32_dcmipp_stat_buf *stats,
++				   ControlList &metadata)
++{
++	/* Set BlackLevel metadata */
++	metadata.set(controls::draft::BlackLevelCorrectionEnable, config_.blackLevel.enable);
++	metadata.set(controls::draft::BlackLevelCorrectionLevels,
++		     { static_cast<int32_t>(config_.blackLevel.blcR),
++		       static_cast<int32_t>(config_.blackLevel.blcG),
++		       static_cast<int32_t>(config_.blackLevel.blcB) });
++}
++
++REGISTER_IPA_ALGORITHM(BlackLevelCorrection, "BlackLevelCorrection")
++
++} /* namespace ipa::dcmipp::algorithms */
++
++} /* namespace libcamera */
+diff --git a/src/ipa/dcmipp/algorithms/blc.h b/src/ipa/dcmipp/algorithms/blc.h
+new file mode 100644
+index 00000000..968d5ce3
+--- /dev/null
++++ b/src/ipa/dcmipp/algorithms/blc.h
+@@ -0,0 +1,44 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++/*
++ * Copyright (C) 2024 ST Microelectronics
++ *
++ * blc.h - STM32 DCMIPP Black Level Correction
++ */
++
++#pragma once
++
++#include "algorithm.h"
++
++namespace libcamera {
++
++namespace ipa::dcmipp::algorithms {
++
++class BlackLevelCorrection : public Algorithm
++{
++public:
++	BlackLevelCorrection() = default;
++
++	int init(IPAContext &context, const YamlObject &tuningData) override;
++	int configure(IPAContext &context, const IPACameraSensorInfo &configInfo) override;
++	void queueRequest(IPAContext &context, const uint32_t frame, IPAFrameContext &frameContext,
++			  const ControlList &controls) override;
++	void prepare(IPAContext &context, const uint32_t frame, IPAFrameContext &frameContext,
++		     stm32_dcmipp_params_cfg *params, ControlList &sensorControls,
++		     ControlList &ispControls) override;
++	void process(IPAContext &context, const uint32_t frame, IPAFrameContext &frameContext,
++		     const stm32_dcmipp_stat_buf *stats, ControlList &metadata) override;
++
++private:
++	struct algoParams {
++		struct IPAIspBlackLevel blackLevel;
++	} params_;
++
++	struct algoConfig {
++		bool pending;
++		struct IPAIspBlackLevel blackLevel;
++	} config_;
++};
++
++} /* namespace ipa::dcmipp::algorithms */
++
++} /* namespace libcamera */
+diff --git a/src/ipa/dcmipp/algorithms/contrast.cpp b/src/ipa/dcmipp/algorithms/contrast.cpp
+new file mode 100644
+index 00000000..8152a432
+--- /dev/null
++++ b/src/ipa/dcmipp/algorithms/contrast.cpp
+@@ -0,0 +1,119 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++/*
++ * Copyright (C) 2024 ST Microelectronics
++ *
++ * contrast.cpp - STM32 DCMIPP Contrast Enhancement
++ */
++
++#include "contrast.h"
++
++#include <libcamera/base/log.h>
++#include <libcamera/control_ids.h>
++
++namespace libcamera {
++
++namespace ipa::dcmipp::algorithms {
++
++LOG_DEFINE_CATEGORY(DcmippContrast)
++
++static constexpr uint32_t kPrecisionFactor = 100;
++static constexpr uint32_t kIdle = 16;
++static constexpr int kContrastSize = 9;
++
++int Contrast::init([[maybe_unused]] IPAContext &context, const YamlObject &tuningData)
++{
++	/* Parse Tuning Data to get algo parameters */
++	/* ISP Contrast */
++	std::vector<int32_t> lum = tuningData["LuminanceFactor"].getList<int32_t>().value_or(std::vector<int32_t>{});
++	if (!lum.size()) {
++		memset(params_.contrast.coeff, 0, kNbContrastFactor * sizeof(params_.contrast.coeff[0]));
++		params_.contrast.enable = false;
++	} else if (lum.size() == kNbContrastFactor) {
++		for (unsigned int i = 0; i < kNbContrastFactor; i++)
++			params_.contrast.coeff[i] = lum[i];
++		params_.contrast.enable = tuningData["Enable"].get<bool>(true);
++	} else {
++		LOG(DcmippContrast, Error) << "Invalid LuminanceFactor";
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++int Contrast::configure([[maybe_unused]] IPAContext &context,
++			[[maybe_unused]] const IPACameraSensorInfo &configInfo)
++{
++	/* Set the initial ISP values in the pending config */
++	config_.contrast = params_.contrast;
++	config_.pending = true;
++
++	return 0;
++}
++
++void Contrast::queueRequest([[maybe_unused]] IPAContext &context,
++			    [[maybe_unused]] const uint32_t frame,
++			    [[maybe_unused]] IPAFrameContext &frameContext,
++			    const ControlList &controls)
++{
++	/* Update params_ and force config_ update now */
++	const auto &enable = controls.get(controls::draft::ContrastLuminanceEnable);
++	const auto &luminance = controls.get(controls::draft::ContrastLuminance);
++
++	if (enable) {
++		params_.contrast.enable = *enable;
++		config_.contrast.enable = params_.contrast.enable;
++		config_.pending = true;
++		LOG(DcmippContrast, Debug) << "Updating contrast status to " << *enable;
++	}
++
++	if (luminance) {
++		std::copy(std::begin(*luminance), std::end(*luminance), params_.contrast.coeff);
++		memcpy(config_.contrast.coeff, params_.contrast.coeff, sizeof(config_.contrast.coeff));
++		config_.pending = true;
++		LOG(DcmippContrast, Debug) << "Updating contrast status to " << (*luminance)[0] << "...";
++	}
++}
++
++void Contrast::prepare(IPAContext &context,
++		       [[maybe_unused]] const uint32_t frame,
++		       [[maybe_unused]] IPAFrameContext &frameContext,
++		       stm32_dcmipp_params_cfg *params,
++		       [[maybe_unused]] ControlList &sensorControls,
++		       [[maybe_unused]] ControlList &ispControls)
++{
++	/* Copy the pending config to the isp_params. Update the IPAContext */
++	if (config_.pending) {
++		/* Configure Contrast params */
++		params->module_cfg_update |= STM32_DCMIPP_ISP_CE;
++		params->ctrls.ce_cfg.en = config_.contrast.enable;
++		for (unsigned int i = 0; i < kNbContrastFactor; i++)
++			/* Convert factor (Unit = 100 for "x1.0") to register format (where 16 means "x1.0") */
++			params->ctrls.ce_cfg.lum[i] = (config_.contrast.coeff[i] * kIdle) / kPrecisionFactor;
++
++		/* Update context */
++		context.isp.contrast = config_.contrast;
++
++		/* Clear the pending request */
++		config_.pending = false;
++	}
++}
++
++void Contrast::process([[maybe_unused]] IPAContext &context,
++		       [[maybe_unused]] const uint32_t frame,
++		       [[maybe_unused]] IPAFrameContext &frameContext,
++		       [[maybe_unused]] const stm32_dcmipp_stat_buf *stats,
++		       ControlList &metadata)
++{
++	/* Set contrast metadata */
++	std::array<int32_t, kContrastSize> contrast;
++
++	metadata.set(controls::draft::ContrastLuminanceEnable, config_.contrast.enable);
++	std::copy(params_.contrast.coeff, params_.contrast.coeff + kContrastSize, contrast.begin());
++	metadata.set(controls::draft::ContrastLuminance, contrast);
++}
++
++REGISTER_IPA_ALGORITHM(Contrast, "Contrast")
++
++} /* namespace ipa::dcmipp::algorithms */
++
++} /* namespace libcamera */
+diff --git a/src/ipa/dcmipp/algorithms/contrast.h b/src/ipa/dcmipp/algorithms/contrast.h
+new file mode 100644
+index 00000000..51dc85e7
+--- /dev/null
++++ b/src/ipa/dcmipp/algorithms/contrast.h
+@@ -0,0 +1,44 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++/*
++ * Copyright (C) 2024 ST Microelectronics
++ *
++ * contrast.h - STM32 DCMIPP Contrast Enhancement
++ */
++
++#pragma once
++
++#include "algorithm.h"
++
++namespace libcamera {
++
++namespace ipa::dcmipp::algorithms {
++
++class Contrast : public Algorithm
++{
++public:
++	Contrast() = default;
++
++	int init(IPAContext &context, const YamlObject &tuningData) override;
++	int configure(IPAContext &context, const IPACameraSensorInfo &configInfo) override;
++	void queueRequest(IPAContext &context, const uint32_t frame, IPAFrameContext &frameContext,
++			  const ControlList &controls) override;
++	void prepare(IPAContext &context, const uint32_t frame, IPAFrameContext &frameContext,
++		     stm32_dcmipp_params_cfg *params, ControlList &sensorControls,
++		     ControlList &ispControls) override;
++	void process(IPAContext &context, const uint32_t frame, IPAFrameContext &frameContext,
++		     const stm32_dcmipp_stat_buf *stats, ControlList &metadata) override;
++
++private:
++	struct algoParams {
++		struct IPAIspContrast contrast;
++	} params_;
++
++	struct algoConfig {
++		bool pending;
++		struct IPAIspContrast contrast;
++	} config_;
++};
++
++} /* namespace ipa::dcmipp::algorithms */
++
++} /* namespace libcamera */
+diff --git a/src/ipa/dcmipp/algorithms/demosaicing.cpp b/src/ipa/dcmipp/algorithms/demosaicing.cpp
+new file mode 100644
+index 00000000..c1db9304
+--- /dev/null
++++ b/src/ipa/dcmipp/algorithms/demosaicing.cpp
+@@ -0,0 +1,110 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++/*
++ * Copyright (C) 2024 ST Microelectronics
++ *
++ * demosaicing.cpp - STM32 DCMIPP Demosaicing Filter
++ */
++
++#include "demosaicing.h"
++
++#include <libcamera/base/log.h>
++#include <libcamera/control_ids.h>
++
++namespace libcamera {
++
++namespace ipa::dcmipp::algorithms {
++
++LOG_DEFINE_CATEGORY(DcmippDemosaicing)
++
++static constexpr unsigned int kNbFilters = 4;
++
++int Demosaicing::init([[maybe_unused]] IPAContext &context, const YamlObject &tuningData)
++{
++	/* Parse Tuning Data to get algo parameters */
++	/* ISP Demosaicing Filter */
++	std::vector<int32_t> filter = tuningData["Filter"].getList<int32_t>().value_or(std::vector<int32_t>{ 0, 0, 0, 0 });
++	if (filter.size() != kNbFilters) {
++		LOG(DcmippDemosaicing, Error) << "Invalid Filter";
++		return -EINVAL;
++	}
++
++	params_.demosaicingFilter.peak = filter[0];
++	params_.demosaicingFilter.linev = filter[1];
++	params_.demosaicingFilter.lineh = filter[2];
++	params_.demosaicingFilter.edge = filter[3];
++
++	return 0;
++}
++
++int Demosaicing::configure([[maybe_unused]] IPAContext &context,
++			   [[maybe_unused]] const IPACameraSensorInfo &configInfo)
++{
++	/* Set the initial ISP values in the pending config */
++	config_.demosaicingFilter = params_.demosaicingFilter;
++	config_.pending = true;
++
++	return 0;
++}
++
++void Demosaicing::queueRequest([[maybe_unused]] IPAContext &context,
++			       [[maybe_unused]] const uint32_t frame,
++			       [[maybe_unused]] IPAFrameContext &frameContext,
++			       const ControlList &controls)
++{
++	/* Update params_ and force config_ update now */
++	const auto &filter = controls.get(controls::draft::DemosaicingFilter);
++
++	if (filter) {
++		params_.demosaicingFilter.peak = (*filter)[0];
++		params_.demosaicingFilter.linev = (*filter)[1];
++		params_.demosaicingFilter.lineh = (*filter)[2];
++		params_.demosaicingFilter.edge = (*filter)[3];
++		config_.demosaicingFilter = params_.demosaicingFilter;
++		config_.pending = true;
++		LOG(DcmippDemosaicing, Debug) << "Updating demosaicing filter to " << (*filter)[0] << "...";
++	}
++}
++
++void Demosaicing::prepare(IPAContext &context,
++			  [[maybe_unused]] const uint32_t frame,
++			  [[maybe_unused]] IPAFrameContext &frameContext,
++			  stm32_dcmipp_params_cfg *params,
++			  [[maybe_unused]] ControlList &sensorControls,
++			  [[maybe_unused]] ControlList &ispControls)
++{
++	/* Copy the pending config to the isp_params. Update the IPAContext */
++	if (config_.pending) {
++		/* Configure Demosaicing filter params */
++		params->module_cfg_update |= STM32_DCMIPP_ISP_DM;
++		params->ctrls.dm_cfg.edge = config_.demosaicingFilter.edge;
++		params->ctrls.dm_cfg.lineh = config_.demosaicingFilter.lineh;
++		params->ctrls.dm_cfg.linev = config_.demosaicingFilter.linev;
++		params->ctrls.dm_cfg.peak = config_.demosaicingFilter.peak;
++
++		/* Update context */
++		context.isp.demosaicingFilter = config_.demosaicingFilter;
++
++		/* Clear the pending request */
++		config_.pending = false;
++	}
++}
++
++void Demosaicing::process([[maybe_unused]] IPAContext &context,
++			  [[maybe_unused]] const uint32_t frame,
++			  [[maybe_unused]] IPAFrameContext &frameContext,
++			  [[maybe_unused]] const stm32_dcmipp_stat_buf *stats,
++			  ControlList &metadata)
++{
++	/* Set demosaicing filter metadata */
++	metadata.set(controls::draft::DemosaicingFilter,
++		     { static_cast<int32_t>(config_.demosaicingFilter.peak),
++		       static_cast<int32_t>(config_.demosaicingFilter.linev),
++		       static_cast<int32_t>(config_.demosaicingFilter.lineh),
++		       static_cast<int32_t>(config_.demosaicingFilter.edge) });
++}
++
++REGISTER_IPA_ALGORITHM(Demosaicing, "Demosaicing")
++
++} /* namespace ipa::dcmipp::algorithms */
++
++} /* namespace libcamera */
+diff --git a/src/ipa/dcmipp/algorithms/demosaicing.h b/src/ipa/dcmipp/algorithms/demosaicing.h
+new file mode 100644
+index 00000000..685af037
+--- /dev/null
++++ b/src/ipa/dcmipp/algorithms/demosaicing.h
+@@ -0,0 +1,44 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++/*
++ * Copyright (C) 2024 ST Microelectronics
++ *
++ * demosaicing.h - STM32 DCMIPP Deomsaicing Filter
++ */
++
++#pragma once
++
++#include "algorithm.h"
++
++namespace libcamera {
++
++namespace ipa::dcmipp::algorithms {
++
++class Demosaicing : public Algorithm
++{
++public:
++	Demosaicing() = default;
++
++	int init(IPAContext &context, const YamlObject &tuningData) override;
++	int configure(IPAContext &context, const IPACameraSensorInfo &configInfo) override;
++	void queueRequest(IPAContext &context, const uint32_t frame, IPAFrameContext &frameContext,
++			  const ControlList &controls) override;
++	void prepare(IPAContext &context, const uint32_t frame, IPAFrameContext &frameContext,
++		     stm32_dcmipp_params_cfg *params, ControlList &sensorControls,
++		     ControlList &ispControls) override;
++	void process(IPAContext &context, const uint32_t frame, IPAFrameContext &frameContext,
++		     const stm32_dcmipp_stat_buf *stats, ControlList &metadata) override;
++
++private:
++	struct algoParams {
++		struct IPAIspDemosaicingFilter demosaicingFilter;
++	} params_;
++
++	struct algoConfig {
++		bool pending;
++		struct IPAIspDemosaicingFilter demosaicingFilter;
++	} config_;
++};
++
++} /* namespace ipa::dcmipp::algorithms */
++
++} /* namespace libcamera */
+diff --git a/src/ipa/dcmipp/algorithms/meson.build b/src/ipa/dcmipp/algorithms/meson.build
+new file mode 100644
+index 00000000..5f4d10a1
+--- /dev/null
++++ b/src/ipa/dcmipp/algorithms/meson.build
+@@ -0,0 +1,11 @@
++# SPDX-License-Identifier: CC0-1.0
++
++dcmipp_ipa_algorithms = files([
++    'statistic.cpp',
++    'badpixel.cpp',
++    'blc.cpp',
++    'demosaicing.cpp',
++    'contrast.cpp',
++    'aec.cpp',
++    'awb.cpp',
++])
+diff --git a/src/ipa/dcmipp/algorithms/statistic.cpp b/src/ipa/dcmipp/algorithms/statistic.cpp
+new file mode 100644
+index 00000000..568e7b27
+--- /dev/null
++++ b/src/ipa/dcmipp/algorithms/statistic.cpp
+@@ -0,0 +1,177 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++/*
++ * Copyright (C) 2024 ST Microelectronics
++ *
++ * statistic.cpp - STM32 DCMIPP Statistic configuration
++ */
++
++#include "statistic.h"
++
++#include <libcamera/base/log.h>
++#include <libcamera/control_ids.h>
++
++namespace libcamera {
++
++namespace ipa::dcmipp::algorithms {
++
++LOG_DEFINE_CATEGORY(DcmippStatistic)
++
++enum StatProfile {
++	ProfileFull = 0,
++	ProfileAvgUp,
++	ProfileAvgDown
++};
++
++static constexpr int kBinsSize = 12;
++
++static int32_t getCycleDuration(uint32_t profile)
++{
++	int32_t duration;
++
++	switch (profile) {
++	default:
++	case ProfileFull:
++		/* 10 requests to get all stats:  (up[1] + down[1]) * (avg[1] + bins[4]) */
++		duration = (1 + 1) * (1 + 4);
++		break;
++	case ProfileAvgUp:
++	case ProfileAvgDown:
++		/* 1 single request to get AVG for up or down */
++		duration = 1;
++	}
++	return duration;
++}
++
++static int32_t luminanceFromRgb(const __u32 RGB[3])
++{
++	return (int32_t)((3 * RGB[0] + 6 * RGB[1] + RGB[2]) / 10);
++}
++
++int Statistic::init([[maybe_unused]] IPAContext &context, const YamlObject &tuningData)
++{
++	/* Parse Tuning Data to get algo parameters */
++	/* ISP Statistic config */
++	params_.statistic.profile = tuningData["Profile"].get<uint32_t>(0);
++
++	std::vector<int32_t> rect = tuningData["Area"].getList<int32_t>().value_or(std::vector<int32_t>{ 0, 0, 0, 0 });
++
++	if (rect.size() != 4) {
++		LOG(DcmippStatistic, Error) << "Invalid Area";
++		return -EINVAL;
++	}
++
++	params_.statistic.area.x0 = rect[0];
++	params_.statistic.area.y0 = rect[1];
++	params_.statistic.area.xSize = rect[2];
++	params_.statistic.area.ySize = rect[3];
++
++	return 0;
++}
++
++int Statistic::configure([[maybe_unused]] IPAContext &context,
++			 [[maybe_unused]] const IPACameraSensorInfo &configInfo)
++{
++	/* Set the initial ISP values in the pending config */
++	config_.statistic = params_.statistic;
++	config_.pending = true;
++
++	return 0;
++}
++
++void Statistic::queueRequest([[maybe_unused]] IPAContext &context,
++			     [[maybe_unused]] const uint32_t frame,
++			     [[maybe_unused]] IPAFrameContext &frameContext,
++			     const ControlList &controls)
++{
++	/* Update params_ and force config_ update now */
++	const auto &profile = controls.get(controls::draft::StatisticProfile);
++	const auto &area = controls.get(controls::draft::StatisticArea);
++
++	if (profile) {
++		params_.statistic.profile = *profile;
++		config_.statistic.profile = params_.statistic.profile;
++		config_.pending = true;
++		LOG(DcmippStatistic, Debug) << "Updating static profile to " << *profile;
++	}
++
++	if (area) {
++		params_.statistic.area.x0 = (*area).x;
++		params_.statistic.area.y0 = (*area).y;
++		params_.statistic.area.xSize = (*area).width;
++		params_.statistic.area.ySize = (*area).height;
++		config_.statistic.area = params_.statistic.area;
++		config_.pending = true;
++		LOG(DcmippStatistic, Debug) << "Updating static area to " << *area;
++	}
++}
++
++void Statistic::prepare(IPAContext &context,
++			[[maybe_unused]] const uint32_t frame,
++			[[maybe_unused]] IPAFrameContext &frameContext,
++			[[maybe_unused]] stm32_dcmipp_params_cfg *params,
++			[[maybe_unused]] ControlList &sensorControls,
++			ControlList &ispControls)
++{
++	/* Copy the pending config to the isp controls (not isp_params). Update the IPAContext */
++	if (config_.pending) {
++		/* Configure Statistic area */
++		Rectangle area(config_.statistic.area.x0, config_.statistic.area.y0,
++			       config_.statistic.area.xSize, config_.statistic.area.ySize);
++		ispControls.set(controls::draft::StatisticArea, area);
++		ispControls.set(controls::draft::StatisticProfile, config_.statistic.profile);
++
++		/* Update context */
++		context.isp.statistic = config_.statistic;
++
++		/* Stat Latency = 1 VSYNC (shadow register) + stat gathering cycle length */
++		context.info.ispStatLatency = getCycleDuration(config_.statistic.profile) + 1;
++
++		/* Clear the pending request */
++		config_.pending = false;
++	}
++}
++
++void Statistic::process([[maybe_unused]] IPAContext &context,
++			[[maybe_unused]] const uint32_t frame,
++			[[maybe_unused]] IPAFrameContext &frameContext,
++			const stm32_dcmipp_stat_buf *stats,
++			ControlList &metadata)
++{
++	/* Set statistic metadata */
++	Rectangle area(config_.statistic.area.x0, config_.statistic.area.y0,
++		       config_.statistic.area.xSize, config_.statistic.area.ySize);
++	metadata.set(controls::draft::StatisticArea, area);
++	metadata.set(controls::draft::StatisticProfile, config_.statistic.profile);
++
++	if ((config_.statistic.profile == ProfileAvgUp) ||
++	    (config_.statistic.profile == ProfileFull)) {
++		metadata.set(controls::draft::StatisticAverageUp,
++			     { static_cast<int32_t>(stats->pre.average_RGB[0]),
++			       static_cast<int32_t>(stats->pre.average_RGB[1]),
++			       static_cast<int32_t>(stats->pre.average_RGB[2]),
++			       luminanceFromRgb(stats->pre.average_RGB) });
++	}
++	if ((config_.statistic.profile == ProfileAvgDown) ||
++	    (config_.statistic.profile == ProfileFull)) {
++		metadata.set(controls::draft::StatisticAverageDown,
++			     { static_cast<int32_t>(stats->post.average_RGB[0]),
++			       static_cast<int32_t>(stats->post.average_RGB[1]),
++			       static_cast<int32_t>(stats->post.average_RGB[2]),
++			       luminanceFromRgb(stats->post.average_RGB) });
++	}
++	if (config_.statistic.profile == ProfileFull) {
++		std::array<int32_t, kBinsSize> bins;
++
++		std::copy(stats->pre.bins, stats->pre.bins + kBinsSize, bins.begin());
++		metadata.set(controls::draft::StatisticBinsUp, bins);
++
++		std::copy(stats->post.bins, stats->post.bins + kBinsSize, bins.begin());
++		metadata.set(controls::draft::StatisticBinsDown, bins);
++	}
++}
++
++REGISTER_IPA_ALGORITHM(Statistic, "Statistic")
++
++} /* namespace ipa::dcmipp::algorithms */
++
++} /* namespace libcamera */
+diff --git a/src/ipa/dcmipp/algorithms/statistic.h b/src/ipa/dcmipp/algorithms/statistic.h
+new file mode 100644
+index 00000000..1185b1a6
+--- /dev/null
++++ b/src/ipa/dcmipp/algorithms/statistic.h
+@@ -0,0 +1,44 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++/*
++ * Copyright (C) 2024 ST Microelectronics
++ *
++ * statistic.h - STM32 DCMIPP Statistic configuration
++ */
++
++#pragma once
++
++#include "algorithm.h"
++
++namespace libcamera {
++
++namespace ipa::dcmipp::algorithms {
++
++class Statistic : public Algorithm
++{
++public:
++	Statistic() = default;
++
++	int init(IPAContext &context, const YamlObject &tuningData) override;
++	int configure(IPAContext &context, const IPACameraSensorInfo &configInfo) override;
++	void queueRequest(IPAContext &context, const uint32_t frame, IPAFrameContext &frameContext,
++			  const ControlList &controls) override;
++	void prepare(IPAContext &context, const uint32_t frame, IPAFrameContext &frameContext,
++		     stm32_dcmipp_params_cfg *params, ControlList &sensorControls,
++		     ControlList &ispControls) override;
++	void process(IPAContext &context, const uint32_t frame, IPAFrameContext &frameContext,
++		     const stm32_dcmipp_stat_buf *stats, ControlList &metadata) override;
++
++private:
++	struct algoParams {
++		struct IPAIspStatistic statistic;
++	} params_;
++
++	struct algoConfig {
++		bool pending;
++		struct IPAIspStatistic statistic;
++	} config_;
++};
++
++} /* namespace ipa::dcmipp::algorithms */
++
++} /* namespace libcamera */
+diff --git a/src/ipa/dcmipp/data/imx335.yaml b/src/ipa/dcmipp/data/imx335.yaml
+new file mode 100644
+index 00000000..6a59290a
+--- /dev/null
++++ b/src/ipa/dcmipp/data/imx335.yaml
+@@ -0,0 +1,54 @@
++# SPDX-License-Identifier: CC0-1.0
++#
++# IMX335 configuration file for the dcmipp IPA.
++%YAML 1.1
++---
++version: 1
++algorithms:
++  - Statistic:
++      # Half screen window, centered
++      Area: [648, 486, 1296, 972]
++      # Profile defines the reported stats:
++      # - 0: "Full Profile": Bins and Average on both Up and Down location
++      # - 1: "Average Up"  : Only Average on Up location (fast report)
++      # - 2: "Average Down": Only Average on Down location (fast report)
++      Profile: 2
++  - BadPixel:
++      Strength: 3
++  - BlackLevelCorrection:
++      Level: [12, 12, 12]
++  - Demosaicing:
++      # Set Peak / LineV / LineH / Edge
++      Filter: [2, 4, 4, 6]
++  - Contrast:
++      LuminanceFactor: [100, 100, 100, 100, 100, 100, 100, 100, 100]
++  - Aec:
++      AeEnable: true
++      AeTarget: 56
++      # Static sensor exposure time in microsec (unused when algo enable)
++      ExposureTime: 26000
++      # Static sensor gain in dB  (unused when algo enable)
++      AnalogueGain_dB: 6.0
++  - Awb:
++      AwbEnable: false
++      ProfileName: ["IMX335-A", "IMX335-TL84", "IMX335-D50", "IMX335-D65", ""]
++      # Reference color temperatures used by the algo
++      RefColorTemp: [2856, 4000, 5000, 6500, 0]
++      # List of GainR/G/B (one entry per color temperature). Unit: 100000000 for "x1.0"
++      GainR: [140000000, 177000000, 220000000, 245000000, 0]
++      GainG: [100000000, 100000000, 100000000, 100000000, 0]
++      GainB: [275000000, 235000000, 180000000, 155000000, 0]
++      # List of Cconv coeff (one Coeff config entry per color temperature). Unit: 100000000 for "x1.0"
++      Cconv: [151460000, -102340000, 50892000, -85991000, 210980000, -24984000, 25000000, -261000000, 341000000,
++              155134500, -69370000, 13106000, -38671000, 167689800, -33936000, 5546200, -66770000, 159944200,
++              180080000, -64840000, -15230000, -35550000, 169920000, -34380000, 9770000, -95700000, 185940000,
++              180080000, -64840000, -15230000, -35550000, 169920000, -34380000, 9770000, -95700000, 185940000,
++              0, 0, 0, 0, 0, 0, 0, 0, 0]
++      # Static (unused when algo enable) gain unit: 100000000 for "x1.0"
++      # Set R / G / B to 2.2 / 1.0 / 1.8
++      FixedGainR: 220000000
++      FixedGainG: 100000000
++      FixedGainB: 180000000
++      # Static (unused when algo enable) cconv coeff unit: 100000000 for "x1.0"
++      # Set (1.8008, -0.6484, -0.1523), (-0.3555, 1.6992, -0.3438), (0.0977, -0.957, 1.8594)
++      FixedCconv: [180080000, -64840000, -15230000, -35550000, 169920000, -34380000, 9770000, -95700000, 185940000]
+diff --git a/src/ipa/dcmipp/data/meson.build b/src/ipa/dcmipp/data/meson.build
+new file mode 100644
+index 00000000..2a4f455c
+--- /dev/null
++++ b/src/ipa/dcmipp/data/meson.build
+@@ -0,0 +1,9 @@
++# SPDX-License-Identifier: CC0-1.0
++
++conf_files = files([
++    'imx335.yaml',
++])
++
++install_data(conf_files,
++             install_dir : ipa_data_dir / 'dcmipp',
++             install_tag : 'runtime')
+diff --git a/src/ipa/dcmipp/dcmipp.cpp b/src/ipa/dcmipp/dcmipp.cpp
+new file mode 100644
+index 00000000..23c891d4
+--- /dev/null
++++ b/src/ipa/dcmipp/dcmipp.cpp
+@@ -0,0 +1,558 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++/*
++ * Copyright (C) 2024 ST Microelectronics
++ *
++ * dcmipp.cpp - STM32 DCMIPP Image Processing Algorithm module
++ */
++#include <cmath>
++
++#include <linux/v4l2-controls.h>
++
++#include <libcamera/base/file.h>
++#include <libcamera/base/log.h>
++
++#include <libcamera/control_ids.h>
++
++#include <libcamera/ipa/dcmipp_ipa_interface.h>
++#include <libcamera/ipa/ipa_interface.h>
++#include <libcamera/ipa/ipa_module_info.h>
++
++#include "libcamera/internal/mapped_framebuffer.h"
++#include "libcamera/internal/yaml_parser.h"
++
++#include "algorithms/algorithm.h"
++#include "libipa/camera_sensor_helper.h"
++#include "linux/stm32-dcmipp-config.h"
++
++#include "ipa_context.h"
++#include "module.h"
++
++namespace libcamera {
++
++LOG_DEFINE_CATEGORY(IPADcmipp)
++
++namespace ipa::dcmipp {
++
++class IPADcmipp : public IPADcmippInterface, public Module
++{
++public:
++	IPADcmipp();
++
++	int init(const IPASettings &settings, unsigned int hwRevision,
++		 const IPACameraSensorInfo &sensorInfo, const ControlInfoMap &sensorControls,
++		 ControlInfoMap *ipaControls) override;
++
++	int start() override;
++	void stop() override;
++
++	int configure(const IPACameraSensorInfo &sensorInfo, const ControlInfoMap &sensorControls,
++		      uint32_t decimation, ControlInfoMap *ipaControls) override;
++
++	void mapBuffers(const std::vector<IPABuffer> &buffers) override;
++	void unmapBuffers(const std::vector<unsigned int> &ids) override;
++
++	void processStatsBuffer(uint32_t frame, uint32_t bufferId) override;
++	void fillParamsBuffer(uint32_t frame, uint32_t bufferId) override;
++	void queueRequest(uint32_t frame, const ControlList &controls) override;
++
++protected:
++	std::string logPrefix() const override;
++
++private:
++	float linearTodB(float gain);
++	float dBToLinear(float gain);
++	void convertControls(ControlList &controls, ControlList &v4l2Controls);
++	void updateControls(const IPACameraSensorInfo &sensorInfo, const ControlInfoMap &sensorControls,
++			    ControlInfoMap *ipaControls);
++	void logConfig(struct stm32_dcmipp_params_cfg *isp_params, ControlList &sensorControls,
++		       ControlList &ispControls);
++	float exposureFactor(struct stm32_dcmipp_isp_ex_cfg *exp, int comp);
++	float cconvCoeff(__u16 reg);
++
++	std::map<unsigned int, FrameBuffer> buffers_;
++	std::map<unsigned int, MappedFrameBuffer> mappedBuffers_;
++
++	ControlInfoMap sensorControls_;
++
++	std::unique_ptr<CameraSensorHelper> camHelper_;
++
++	struct IPAContext context_;
++	struct IPAFrameContext frameContext_; /* not used, kept for compatibility with module */
++};
++
++/* List of controls handled by the DCMIPP IPA */
++const ControlInfoMap::Map dcmippControls{
++	{ &controls::draft::ColourGains3Enable, ControlInfo(false, true) },
++	{ &controls::draft::ColourGains3, ControlInfo(0, 1600000000, 100000000) },
++	{ &controls::draft::ColourCorrectionEnable, ControlInfo(false, true) },
++	{ &controls::draft::ColourCorrection, ControlInfo(-400000000, 400000000, 0) },
++	{ &controls::AwbEnable, ControlInfo(false, true) },
++	{ &controls::AwbMode, ControlInfo(controls::AwbModeValues) },
++	{ &controls::draft::AwbProfileName, ControlInfo(0, 32, 32) },
++	{ &controls::draft::AwbReferenceColorTemperature, ControlInfo(0, 10000, 0) },
++	{ &controls::draft::AwbColourGains3, ControlInfo(0, 1600000000, 100000000) },
++	{ &controls::draft::AwbColourCorrection, ControlInfo(-400000000, 400000000, 0) },
++	{ &controls::draft::AwbCustomColorTemperature, ControlInfo(0, 10000, 0) },
++	{ &controls::draft::BlackLevelCorrectionEnable, ControlInfo(false, true) },
++	{ &controls::draft::BlackLevelCorrectionLevels, ControlInfo(0, 255, 0) },
++	{ &controls::draft::BadPixelRemovalEnable, ControlInfo(false, true) },
++	{ &controls::draft::BadPixelRemovalStrength, ControlInfo(-1, 7, -1) },
++	{ &controls::draft::BadPixelRemovalThreshold, ControlInfo(0, 4094 * 4094, 0) },
++	{ &controls::draft::DemosaicingFilter, ControlInfo(0, 7, 0) },
++	{ &controls::draft::ContrastLuminanceEnable, ControlInfo(false, true) },
++	{ &controls::draft::ContrastLuminance, ControlInfo(0, 394, 0) },
++	{ &controls::draft::StatisticArea, ControlInfo(Rectangle{}, Rectangle(4094, 4094, 4094, 4094), Rectangle{}) },
++	{ &controls::draft::StatisticProfile, ControlInfo(0, 2, 0) },
++	{ &controls::AeEnable, ControlInfo(false, true) },
++	{ &controls::draft::AeExposureTarget, ControlInfo(0, 255, 56) },
++};
++
++IPADcmipp::IPADcmipp()
++	: context_({})
++{
++}
++
++std::string IPADcmipp::logPrefix() const
++{
++	return "DCMIPP";
++}
++
++int IPADcmipp::init(const IPASettings &settings, unsigned int hwRevision,
++		    const IPACameraSensorInfo &sensorInfo, const ControlInfoMap &sensorControls,
++		    ControlInfoMap *ipaControls)
++{
++	LOG(IPADcmipp, Debug) << __func__;
++
++	context_ = {};
++
++	context_.info.hwRevision = hwRevision;
++	sensorControls_ = sensorControls;
++	camHelper_ = CameraSensorHelperFactoryBase::create(settings.sensorModel);
++	if (!camHelper_)
++		LOG(IPADcmipp, Warning) << "No camera sensor helper for " << settings.sensorModel;
++	context_.info.sensorStatLatency = 1;
++
++	/* Initialize controls. */
++	updateControls(sensorInfo, sensorControls, ipaControls);
++
++	/* Load and parse the tuning data file */
++	if (!settings.configurationFile.empty()) {
++		LOG(IPADcmipp, Debug) << "Parsing IPA settings from " << settings.configurationFile;
++		File file(settings.configurationFile);
++		if (!file.open(File::OpenModeFlag::ReadOnly)) {
++			int ret = file.error();
++			LOG(IPADcmipp, Error) << "Failed to open " << settings.configurationFile << ": "
++					      << strerror(-ret);
++			return ret;
++		}
++
++		std::unique_ptr<libcamera::YamlObject> data = YamlParser::parse(file);
++		if (!data)
++			return -EINVAL;
++		int ret = createAlgorithms(context_, (*data)["algorithms"]);
++		if (ret)
++			return ret;
++	}
++
++	return 0;
++}
++
++int IPADcmipp::start()
++{
++	LOG(IPADcmipp, Debug) << __func__;
++
++	return 0;
++}
++
++void IPADcmipp::stop()
++{
++	LOG(IPADcmipp, Debug) << __func__;
++}
++
++int IPADcmipp::configure(const IPACameraSensorInfo &sensorInfo,
++			 const ControlInfoMap &sensorControls,
++			 uint32_t decimation,
++			 ControlInfoMap *ipaControls)
++{
++	LOG(IPADcmipp, Debug) << __func__;
++
++	/* Update the camera controls using the new sensor settings. */
++	updateControls(sensorInfo, sensorControls, ipaControls);
++
++	/* Configure algorithms */
++	for (auto const &algo : algorithms()) {
++		int ret = algo->configure(context_, sensorInfo);
++		if (ret) {
++			LOG(IPADcmipp, Error) << "Failed to configure algorithm: " << strerror(ret);
++			return ret;
++		}
++	}
++
++	context_.isp.decimationRatio = decimation;
++	context_.info.sensorBitsPerPixel = sensorInfo.bitsPerPixel;
++
++	return 0;
++}
++
++void IPADcmipp::mapBuffers(const std::vector<IPABuffer> &buffers)
++{
++	LOG(IPADcmipp, Debug) << __func__;
++
++	for (const IPABuffer &buffer : buffers) {
++		auto elem = buffers_.emplace(std::piecewise_construct,
++					     std::forward_as_tuple(buffer.id),
++					     std::forward_as_tuple(buffer.planes));
++		const FrameBuffer &fb = elem.first->second;
++
++		MappedFrameBuffer mappedBuffer(&fb, MappedFrameBuffer::MapFlag::ReadWrite);
++		if (!mappedBuffer.isValid())
++			LOG(IPADcmipp, Error) << "Failed to mmap buffer: " << strerror(mappedBuffer.error());
++
++		mappedBuffers_.emplace(buffer.id, std::move(mappedBuffer));
++	}
++}
++
++void IPADcmipp::unmapBuffers(const std::vector<unsigned int> &ids)
++{
++	LOG(IPADcmipp, Debug) << __func__;
++
++	for (unsigned int id : ids) {
++		const auto fb = buffers_.find(id);
++		if (fb == buffers_.end())
++			continue;
++
++		mappedBuffers_.erase(id);
++		buffers_.erase(id);
++	}
++}
++
++void IPADcmipp::queueRequest(uint32_t frame, const ControlList &controls)
++{
++	LOG(IPADcmipp, Debug) << __func__ << " frame: " << frame;
++
++	/* Send request to algorithms */
++	for (auto const &algo : algorithms())
++		algo->queueRequest(context_, frame, frameContext_, controls);
++}
++
++void IPADcmipp::processStatsBuffer(uint32_t frame, uint32_t bufferId)
++{
++	LOG(IPADcmipp, Debug) << __func__ << " frame: " << frame << " bufferId: " << bufferId;
++
++	/* Check bufferId validity */
++	auto it = buffers_.find(bufferId);
++	if (it == buffers_.end()) {
++		LOG(IPADcmipp, Error) << "Could not find stats buffer";
++		return;
++	}
++
++	/* Get buffer */
++	struct stm32_dcmipp_stat_buf *stats = reinterpret_cast<struct stm32_dcmipp_stat_buf *>(
++		mappedBuffers_.at(bufferId).planes()[0].data());
++
++	/* Ask algo to process stats */
++	LOG(IPADcmipp, Debug) << "Calling algo process";
++	ControlList metadata;
++	for (auto const &algo : algorithms())
++		algo->process(context_, frame, frameContext_, stats, metadata);
++
++	/* Add additional information */
++	metadata.set(controls::draft::IspDecimationRatio, context_.isp.decimationRatio);
++	metadata.set(controls::draft::SensorBitsPerPixel, context_.info.sensorBitsPerPixel);
++	metadata.set(controls::draft::PipelineHwRevision, context_.info.hwRevision);
++
++	/* Send metadata (controls) */
++	metadataReady.emit(frame, metadata);
++
++	/* Inform that the buffer can be freed now */
++	statsBufferProcessed.emit(bufferId);
++}
++
++void IPADcmipp::fillParamsBuffer(uint32_t frame, uint32_t bufferId)
++{
++	LOG(IPADcmipp, Debug) << __func__ << " frame: " << frame << " bufferId: " << bufferId;
++
++	/* Check bufferId validity */
++	auto it = buffers_.find(bufferId);
++	if (it == buffers_.end()) {
++		LOG(IPADcmipp, Error) << "Could not find parameter buffer";
++		return;
++	}
++
++	/* Get buffer */
++	struct stm32_dcmipp_params_cfg *isp_params = reinterpret_cast<struct stm32_dcmipp_params_cfg *>(
++		mappedBuffers_.at(bufferId).planes()[0].data());
++
++	/* Ask algo to provide new configuration */
++	ControlList ispControls, sensorControls;
++	memset(isp_params, 0, sizeof(struct stm32_dcmipp_params_cfg));
++
++	LOG(IPADcmipp, Debug) << "Calling algo prepare";
++	for (auto const &a : algorithms()) {
++		Algorithm *algo = static_cast<Algorithm *>(a.get());
++		algo->prepare(context_, frame, frameContext_, isp_params, sensorControls, ispControls);
++	}
++
++	/* Log new isp and sensor config */
++	logConfig(isp_params, sensorControls, ispControls);
++
++	/* Inform that the sensor config can be applied */
++	ControlList v4l2SensorControls(sensorControls_);
++	convertControls(sensorControls, v4l2SensorControls);
++	setSensorControls.emit(0, v4l2SensorControls);
++
++	/* Inform that the buffer can be applied for ISP HW update (buff params + optional v4l2 ctrl) */
++	if (!ispControls.empty()) {
++		ControlList v4l2IspControls;
++		convertControls(ispControls, v4l2IspControls);
++		setIspControls.emit(0, v4l2IspControls);
++	}
++	paramsBufferReady.emit(bufferId);
++}
++
++float IPADcmipp::linearTodB(float gain)
++{
++	return 20 * std::log10(gain);
++}
++
++float IPADcmipp::dBToLinear(float gain)
++{
++	return std::pow(10, gain / 20);
++}
++
++void IPADcmipp::convertControls(ControlList &controls, ControlList &v4l2Controls)
++{
++	/* Converts exposure to V4L2 control unit (number of lines) */
++	const auto &exposure = controls.get(controls::ExposureTime);
++	if (exposure)
++		v4l2Controls.set(V4L2_CID_EXPOSURE, (int32_t)(*exposure / context_.info.sensorLineDuration_us));
++
++	/* Converts gain to V4L2 control unit (eg 0.3 dB step for IMX335 sensor) */
++	const auto &gain = controls.get(controls::draft::AnalogueGain_dB);
++	if (gain && camHelper_) {
++		float gainLinear = dBToLinear(*gain);
++		v4l2Controls.set(V4L2_CID_ANALOGUE_GAIN, (int32_t)(camHelper_->gainCode(gainLinear)));
++	}
++
++	/* Converts statistic area */
++	const auto &area = controls.get(controls::draft::StatisticArea);
++	if (area) {
++		struct v4l2_ctrl_isp_stat_region region;
++
++		region.nb_regions = 1;
++		region.top[0] = area->x / context_.isp.decimationRatio;
++		region.left[0] = area->y / context_.isp.decimationRatio;
++		region.width[0] = area->width / context_.isp.decimationRatio;
++		region.height[0] = area->height / context_.isp.decimationRatio;
++
++		ControlValue c(Span<const uint8_t>{ reinterpret_cast<uint8_t *>(&region), sizeof(region) });
++		v4l2Controls.set(V4L2_CID_ISP_STAT_REGION, c);
++	}
++
++	/* Converts statistic profile */
++	const auto &profile = controls.get(controls::draft::StatisticProfile);
++	if (profile)
++		v4l2Controls.set(V4L2_CID_ISP_STAT_PROFILE, *profile);
++}
++
++void IPADcmipp::updateControls(const IPACameraSensorInfo &sensorInfo,
++			       const ControlInfoMap &sensorControls, ControlInfoMap *ipaControls)
++{
++	ControlInfoMap::Map ctrlMap = dcmippControls;
++
++	/* Add the exposure control (in microseconds) */
++	const ControlInfo &v4l2Exposure = sensorControls.find(V4L2_CID_EXPOSURE)->second;
++	double lineDuration_us = sensorInfo.minLineLength / (sensorInfo.pixelRate / 1000000.0f);
++	context_.info.sensorLineDuration_us = lineDuration_us;
++	int32_t minExposure_us = v4l2Exposure.min().get<int32_t>() * lineDuration_us;
++	int32_t maxExposure_us = v4l2Exposure.max().get<int32_t>() * lineDuration_us;
++	int32_t defExposure_us = v4l2Exposure.def().get<int32_t>() * lineDuration_us;
++	context_.info.sensorExposureMin = minExposure_us;
++	context_.info.sensorExposureMax = maxExposure_us;
++
++	ctrlMap.emplace(std::piecewise_construct,
++			std::forward_as_tuple(&controls::ExposureTime),
++			std::forward_as_tuple(minExposure_us, maxExposure_us, defExposure_us));
++
++	/* Add the sensor analogue gain */
++	if (camHelper_) {
++		const ControlInfo &v4l2Gain = sensorControls.find(V4L2_CID_ANALOGUE_GAIN)->second;
++		float minGainLinear = camHelper_->gain(v4l2Gain.min().get<int32_t>());
++		float maxGainLinear = camHelper_->gain(v4l2Gain.max().get<int32_t>());
++		float defGainLinear = camHelper_->gain(v4l2Gain.def().get<int32_t>());
++		float minGain = linearTodB(minGainLinear);
++		float maxGain = linearTodB(maxGainLinear);
++		float defGain = linearTodB(defGainLinear);
++		context_.info.sensorGainMin = minGain;
++		context_.info.sensorGainMax = maxGain;
++
++		ctrlMap.emplace(std::piecewise_construct,
++				std::forward_as_tuple(&controls::draft::AnalogueGain_dB),
++				std::forward_as_tuple(minGain, maxGain, defGain));
++	}
++
++	/* Add the frame duration limits */
++	const ControlInfo &v4l2HBlank = sensorControls.find(V4L2_CID_HBLANK)->second;
++	const ControlInfo &v4l2VBlank = sensorControls.find(V4L2_CID_VBLANK)->second;
++
++	uint32_t hblank = v4l2HBlank.def().get<int32_t>();
++	uint32_t lineLength = sensorInfo.outputSize.width + hblank;
++	uint32_t sizeHeight = sensorInfo.outputSize.height;
++
++	uint64_t minFrameSize = (uint64_t)(v4l2VBlank.min().get<int32_t>() + sizeHeight) * lineLength;
++	uint64_t maxFrameSize = (uint64_t)(v4l2VBlank.max().get<int32_t>() + sizeHeight) * lineLength;
++	uint64_t defFrameSize = (uint64_t)(v4l2VBlank.def().get<int32_t>() + sizeHeight) * lineLength;
++
++	int64_t minDurations_us = minFrameSize / (sensorInfo.pixelRate / 1000000U);
++	int64_t maxDurations_us = maxFrameSize / (sensorInfo.pixelRate / 1000000U);
++	int64_t defDurations_us = defFrameSize / (sensorInfo.pixelRate / 1000000U);
++
++	ctrlMap.emplace(std::piecewise_construct,
++			std::forward_as_tuple(&controls::FrameDurationLimits),
++			std::forward_as_tuple(minDurations_us, maxDurations_us, defDurations_us));
++
++	*ipaControls = ControlInfoMap(std::move(ctrlMap), controls::controls);
++}
++
++void IPADcmipp::logConfig(struct stm32_dcmipp_params_cfg *p, ControlList &sensorControls,
++			  ControlList &ispControls)
++{
++	if (p->module_cfg_update & STM32_DCMIPP_ISP_BPR)
++		LOG(IPADcmipp, Debug) << "ISP update - BAD PIXEL: "
++				      << (p->ctrls.bpr_cfg.en ? "enabled" : "disabled") << " ("
++				      << p->ctrls.bpr_cfg.strength << ")";
++
++	if (p->module_cfg_update & STM32_DCMIPP_ISP_BLC)
++		LOG(IPADcmipp, Debug) << "ISP update - BLACK LEVEL: "
++				      << (p->ctrls.blc_cfg.en ? "enabled" : "disabled") << " ("
++				      << (int)p->ctrls.blc_cfg.blc_r << " / "
++				      << (int)p->ctrls.blc_cfg.blc_g << " / "
++				      << (int)p->ctrls.blc_cfg.blc_b << ")";
++
++	if (p->module_cfg_update & STM32_DCMIPP_ISP_EX)
++		LOG(IPADcmipp, Debug) << "ISP update - EXPOSURE: "
++				      << (p->ctrls.ex_cfg.en ? "enabled" : "disabled") << " ("
++				      << "R x" << exposureFactor(&p->ctrls.ex_cfg, 0) << " /"
++				      << "G x" << exposureFactor(&p->ctrls.ex_cfg, 1) << " /"
++				      << "B x" << exposureFactor(&p->ctrls.ex_cfg, 2) << ")";
++
++	if (p->module_cfg_update & STM32_DCMIPP_ISP_CC)
++		LOG(IPADcmipp, Debug) << "ISP update - COLOR CONVERSION: "
++				      << (p->ctrls.cc_cfg.en ? "enabled" : "disabled") << " ("
++				      << " (" << cconvCoeff(p->ctrls.cc_cfg.rr)
++				      << " , " << cconvCoeff(p->ctrls.cc_cfg.rg)
++				      << " , " << cconvCoeff(p->ctrls.cc_cfg.rb)
++				      << ") , (" << cconvCoeff(p->ctrls.cc_cfg.gr)
++				      << " , " << cconvCoeff(p->ctrls.cc_cfg.gg)
++				      << " , " << cconvCoeff(p->ctrls.cc_cfg.gb)
++				      << ") , (" << cconvCoeff(p->ctrls.cc_cfg.br)
++				      << " , " << cconvCoeff(p->ctrls.cc_cfg.bg)
++				      << " , " << cconvCoeff(p->ctrls.cc_cfg.bb) << ")";
++
++	if (p->module_cfg_update & STM32_DCMIPP_ISP_DM)
++		LOG(IPADcmipp, Debug) << "ISP update - DEMOSAICING: "
++				      << (int)p->ctrls.dm_cfg.edge << " / "
++				      << (int)p->ctrls.dm_cfg.lineh << " / "
++				      << (int)p->ctrls.dm_cfg.linev << " / "
++				      << (int)p->ctrls.dm_cfg.peak;
++
++	if (p->module_cfg_update & STM32_DCMIPP_ISP_CE)
++		LOG(IPADcmipp, Debug) << "ISP update - CONTRAST: "
++				      << (p->ctrls.ce_cfg.en ? "enabled" : "disabled") << " ("
++				      << (float)p->ctrls.ce_cfg.lum[0] / 16 << ", "
++				      << (float)p->ctrls.ce_cfg.lum[1] / 16 << ", "
++				      << (float)p->ctrls.ce_cfg.lum[2] / 16 << ", "
++				      << (float)p->ctrls.ce_cfg.lum[3] / 16 << ", "
++				      << (float)p->ctrls.ce_cfg.lum[4] / 16 << ", "
++				      << (float)p->ctrls.ce_cfg.lum[5] / 16 << ", "
++				      << (float)p->ctrls.ce_cfg.lum[6] / 16 << ", "
++				      << (float)p->ctrls.ce_cfg.lum[7] / 16 << ", "
++				      << (float)p->ctrls.ce_cfg.lum[8] / 16 << ")";
++
++	/* ISP control updates */
++	const auto &area = ispControls.get(controls::draft::StatisticArea);
++	if (area)
++		LOG(IPADcmipp, Debug) << "ISP update - STAT AREA: ("
++				      << area->width << " x "
++				      << area->height << ") @ ("
++				      << area->x << ", "
++				      << area->y << ")";
++
++	const auto &profile = ispControls.get(controls::draft::StatisticProfile);
++	if (profile)
++		LOG(IPADcmipp, Debug) << "ISP update - STAT PROFILE: " << *profile;
++
++	/* Sensor Updates (exposure and gain) */
++	const auto &exposure = sensorControls.get(controls::ExposureTime);
++	if (exposure)
++		LOG(IPADcmipp, Debug) << "SENSOR update - EXPOSURE: " << *exposure << " us";
++
++	const auto &gain = sensorControls.get(controls::draft::AnalogueGain_dB);
++	if (gain)
++		LOG(IPADcmipp, Debug) << "SENSOR update - GAIN: " << *gain << " dB";
++}
++
++float IPADcmipp::exposureFactor(struct stm32_dcmipp_isp_ex_cfg *exp, int comp)
++{
++	/* Convert Shift + Multiplier to Factor */
++	uint32_t shift, mult;
++
++	switch (comp) {
++	default:
++	case 0:
++		shift = exp->shift_r;
++		mult = exp->mult_r;
++		break;
++	case 1:
++		shift = exp->shift_g;
++		mult = exp->mult_g;
++		break;
++	case 2:
++		shift = exp->shift_b;
++		mult = exp->mult_b;
++		break;
++	}
++	float factor = 1 << shift;
++	factor = (factor * mult) / 128;
++	return factor;
++}
++
++float IPADcmipp::cconvCoeff(__u16 reg)
++{
++	/* Convert from register format to float format */
++	float coeff;
++
++	if (reg & 0x400) {
++		int32_t val = reg;
++		val = (val - 1) ^ 0x7FF;
++		coeff = -(float)val / 256;
++	} else {
++		coeff = (float)reg / 256;
++	}
++
++	return coeff;
++}
++
++} /* namespace ipa::dcmipp */
++
++/*
++ * External IPA module interface
++ */
++
++extern "C" {
++const struct IPAModuleInfo ipaModuleInfo = {
++	IPA_MODULE_API_VERSION,
++	0,
++	"dcmipp",
++	"dcmipp",
++};
++
++IPAInterface *ipaCreate()
++{
++	LOG(IPADcmipp, Debug) << __func__;
++
++	return new ipa::dcmipp::IPADcmipp();
++}
++}
++
++} /* namespace libcamera */
+diff --git a/src/ipa/dcmipp/ipa_context.h b/src/ipa/dcmipp/ipa_context.h
+new file mode 100644
+index 00000000..beea7384
+--- /dev/null
++++ b/src/ipa/dcmipp/ipa_context.h
+@@ -0,0 +1,120 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++/*
++ * Copyright (C) 2024 ST Microelectronics
++ *
++ * ipa_context.h - STM32 DCMIPP IPA Context
++ */
++
++#pragma once
++
++#include <stdint.h>
++
++namespace libcamera {
++
++namespace ipa::dcmipp {
++
++static constexpr unsigned int kNbContrastFactor = 9;
++
++/* Sensor config */
++struct IPASensor {
++	double gain; /* Analogue gain in dB */
++	int32_t exposure; /* Exposure time in microseconds */
++};
++
++/* ISP Statistic */
++struct IPAIspStatistic {
++	struct { /* Coordinates */
++		uint32_t x0;
++		uint32_t y0;
++		uint32_t xSize;
++		uint32_t ySize;
++	} area;
++	uint32_t profile; /* Reported Stats (0:Full 1:AvgUp 2:AvgDown) */
++};
++
++/* ISP Bad pixel */
++struct IPAIspBadpixel {
++	uint8_t enable; /* Enable or disable */
++	uint8_t strength; /* Strength of the bad pixel removal algorithm */
++};
++
++/* ISP Black Level */
++struct IPAIspBlackLevel {
++	uint8_t enable; /* Enable or disable */
++	uint8_t blcR; /* Level offset for the red component */
++	uint8_t blcG; /* Level offset for the green component */
++	uint8_t blcB; /* Level offset for the blue component */
++};
++
++/* ISP Demosaicing filter */
++struct IPAIspDemosaicingFilter {
++	uint8_t edge; /* Edge detection strength */
++	uint8_t lineh; /* Horizontal line detection strength */
++	uint8_t linev; /* Vertical line detection strength */
++	uint8_t peak; /* Peak detection strength */
++};
++
++/* ISP Contrast */
++struct IPAIspContrast {
++	uint8_t enable; /* Enable or disable */
++	uint32_t coeff[kNbContrastFactor]; /* Luminance amplification factor. Unit = 100 for "x1.0" */
++};
++
++/* ISP Gain ('exposure') */
++struct IPAIspGain {
++	uint8_t enable; /* Enable or disable */
++	uint32_t gainR; /* Gain of the red component. Unit = 100000000 for "x1.0", 150000000 for "x1.5". Max gain is "x16" */
++	uint32_t gainG; /* Gain of the green component */
++	uint32_t gainB; /* Gain of the blue component */
++};
++
++/* ISP Color Conversion */
++struct IPAIspColorConv {
++	uint8_t enable; /* Enable or disable */
++	int32_t coeff[3][3]; /* 3x3 RGB to RGB matrix coefficients. Unit = 100000000 for "x1.0", -150000000 for "x-1.5". Range is "x-4.0" to "x4.0" */
++};
++
++/* IPA context */
++struct IPAContext {
++	/* ISP config */
++	struct IPAIsp {
++		struct IPAIspStatistic statistic;
++		struct IPAIspBadpixel badpixel;
++		struct IPAIspBlackLevel blackLevel;
++		struct IPAIspDemosaicingFilter demosaicingFilter;
++		struct IPAIspContrast contrast;
++		struct IPAIspGain gain;
++		struct IPAIspColorConv cconv;
++		uint32_t decimationRatio;
++	} isp;
++
++	/* Sensor config */
++	struct IPASensor sensor;
++
++	/* General information */
++	struct IPAInfo {
++		uint8_t AECEnable; /* AEC algo enable or disable */
++		uint32_t AECExposureTarget; /* AEC Exposure Target */
++		uint8_t AWBEnable; /* AWB algo enable or disable */
++		uint32_t CCT; /* Estimated Correlated Color Temperature */
++		double sensorLineDuration_us; /* Sensor line duration in microseconds */
++		double sensorGainMin; /* Sensor min analogue gain in dB */
++		double sensorGainMax; /* Sensor max analogue gain in dB */
++		int32_t sensorExposureMin; /* Sensor min exposure time in microseconds */
++		int32_t sensorExposureMax; /* Sensor max exposure time in microseconds */
++		int32_t ispStatLatency; /* Nb of Vsync to get stats after ISP update */
++		int32_t sensorStatLatency; /* Nb of Vsync to get stats after sensor update */
++		uint32_t sensorBitsPerPixel; /* Nb of bpp from the sensor */
++		uint32_t hwRevision; /* DCMIPP HW version */
++	} info;
++
++	/* TODO: maybe add frame size info */
++};
++
++/* Frame context, not used for the time being. Declaration required to use module */
++struct IPAFrameContext {
++};
++
++} /* namespace ipa::dcmipp */
++
++} /* namespace libcamera */
+diff --git a/src/ipa/dcmipp/meson.build b/src/ipa/dcmipp/meson.build
+new file mode 100644
+index 00000000..dd5aee3a
+--- /dev/null
++++ b/src/ipa/dcmipp/meson.build
+@@ -0,0 +1,32 @@
++# SPDX-License-Identifier: CC0-1.0
++
++subdir('algorithms')
++subdir('data')
++
++ipa_name = 'ipa_dcmipp'
++
++dcmipp_ipa_sources = files([
++    'dcmipp.cpp',
++])
++
++dcmipp_ipa_sources += dcmipp_ipa_algorithms
++
++mod = shared_module(ipa_name,
++                    [dcmipp_ipa_sources, libcamera_generated_ipa_headers],
++                    name_prefix : '',
++                    include_directories : [ipa_includes, libipa_includes],
++                    dependencies : libcamera_private,
++                    link_with : libipa,
++                    install : true,
++                    install_dir : ipa_install_dir)
++
++if ipa_sign_module
++    custom_target(ipa_name + '.so.sign',
++                  input : mod,
++                  output : ipa_name + '.so.sign',
++                  command : [ipa_sign, ipa_priv_key, '@INPUT@', '@OUTPUT@'],
++                  install : false,
++                  build_by_default : true)
++endif
++
++ipa_names += ipa_name
+diff --git a/src/ipa/dcmipp/module.h b/src/ipa/dcmipp/module.h
+new file mode 100644
+index 00000000..2faecf85
+--- /dev/null
++++ b/src/ipa/dcmipp/module.h
+@@ -0,0 +1,27 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++/*
++ * Copyright (C) 2024 ST Microelectronics
++ *
++ * module.h - STM32 DCCMIPP IPA Module
++ */
++
++#pragma once
++
++#include <libcamera/ipa/dcmipp_ipa_interface.h>
++
++#include <libipa/module.h>
++
++#include "linux/stm32-dcmipp-config.h"
++
++#include "ipa_context.h"
++
++namespace libcamera {
++
++namespace ipa::dcmipp {
++
++using Module = ipa::Module<IPAContext, IPAFrameContext, IPACameraSensorInfo,
++			   stm32_dcmipp_params_cfg, stm32_dcmipp_stat_buf>;
++
++} /* namespace ipa::dcmipp */
++
++} /* namespace libcamera*/
+diff --git a/src/ipa/rpi/controller/rpi/alsc.cpp b/src/ipa/rpi/controller/rpi/alsc.cpp
+index 961209ea..67029fc3 100644
+--- a/src/ipa/rpi/controller/rpi/alsc.cpp
++++ b/src/ipa/rpi/controller/rpi/alsc.cpp
+@@ -496,8 +496,8 @@ void resampleCalTable(const Array2D<double> &calTableIn,
+ 	 * Precalculate and cache the x sampling locations and phases to save
+ 	 * recomputing them on every row.
+ 	 */
+-	int *xLo = (int*)malloc(X), *xHi = (int*)malloc(X);
+-	double *xf = (double*)malloc(X);
++	int xLo[X], xHi[X];
++	double xf[X];
+ 	double scaleX = cameraMode.sensorWidth /
+ 			(cameraMode.width * cameraMode.scaleX);
+ 	double xOff = cameraMode.cropX / (double)cameraMode.sensorWidth;
+@@ -539,9 +539,6 @@ void resampleCalTable(const Array2D<double> &calTableIn,
+ 			*(out++) = above * (1 - yf) + below * yf;
+ 		}
+ 	}
+-	free(xf);
+-	free(xHi);
+-	free(xLo);
+ }
+ 
+ /* Calculate chrominance statistics (R/G and B/G) for each region. */
+diff --git a/src/libcamera/control_ids_draft.yaml b/src/libcamera/control_ids_draft.yaml
+index 9bef5bf1..ad221c52 100644
+--- a/src/libcamera/control_ids_draft.yaml
++++ b/src/libcamera/control_ids_draft.yaml
+@@ -227,4 +227,211 @@ controls:
+             value. All of the custom test patterns will be static (that is the
+             raw image must not vary from frame to frame).
+ 
++  - AnalogueGain_dB:
++      type: float
++      description: |
++        Analogue gain value applied in the sensor device expressed in decibel.
++        The value of the control specifies the gain multiplier applied to all
++        colour channels. This value cannot be lower than 0.0.
++
++        Setting this value means that it is now fixed and the AE algorithm may
++        not change it. Setting it back to a negative value returns it to the
++        control of the AE algorithm.
++
++  - AeExposureTarget:
++      type: int32_t
++      description: |
++        Exposure target for the AE algorithm to use.
++
++  - ColourGains3Enable:
++      type: bool
++      description: |
++        ColourGains3 feature enable status.
++
++  - ColourGains3:
++      type: int32_t
++      description: |
++        Gain values for the 3 colour channels, Red, Green and Blue in that
++        order.
++        Unit = 100000000 for "x1.0", 150000000 for "x1.5".
++      size: [3]
++
++  - ColourCorrectionEnable:
++      type: bool
++      description: |
++        ColourCorrection feature enable status.
++
++  - ColourCorrection:
++      type: int32_t
++      description: |
++        The 3x3 matrix that converts camera RGB to sRGB within the
++        imaging pipeline. This should describe the matrix that is used
++        after pixels have been white-balanced, but before any gamma
++        transformation. The 3x3 matrix is stored in conventional reading
++        order in an array of 9 values.
++        Unit = 100000000 for "x1.0", 150000000 for "x1.5".
++      size: [3,3]
++
++  - AwbProfileName:
++      type: string
++      description: |
++        Array of AWB profile name (one entry per profile) used by the AWB
++        algorithm.
++      size: [5]
++
++  - AwbReferenceColorTemperature:
++      type: int32_t
++      description: |
++        Array of reference color tempeartures (one entry per profile) used by
++        the AWB algorithm.
++      size: [5]
++
++  - AwbColourGains3:
++      type: int32_t
++      description: |
++        Array of ColourGains3 (one entry per profile) used by the AWB algorithm.
++      size: [5,3]
++
++  - AwbColourCorrection:
++      type: int32_t
++      description: |
++        Array of ColourCorrection (one entry per profile) used by the AWB
++        algorithm.
++      size: [5,3,3]
++
++  - AwbCustomColorTemperature:
++      type: int32_t
++      description: |
++        Color Temperature specifying a custom Awb mode. Must be a value of
++        AwbReferenceColorTemperature[].
++        Applicable when AwbMode is set to AwbCustom.
++
++  - BadPixelRemovalEnable:
++      type: bool
++      description: |
++        BadPixelRemoval feature enable status.
++
++  - BadPixelRemovalStrength:
++      type: int32_t
++      description: |
++        Strength of the detection and correction artifacts generated by a bad
++        pixel on the sensor array.
++        If BadPixelRemovalThreshold is set to a positive value, then this
++        setting is under control of the BadPixelRemoval algorithm.
++
++  - BadPixelRemovalThreshold:
++      type: int32_t
++      description: |
++        If set to a positive value, the BadPixelRemoval algorithm adjusts the
++        strength of detection so the amount of expected bad pixel corrected is
++        as close as possible to that threshold.
++
++  - BadPixelRemovalCount:
++      type: int32_t
++      description: |
++        Report of the amount of bad components corrected.
++
++  - BlackLevelCorrectionEnable:
++      type: bool
++      description: |
++        BlackLevelCorrection feature enable status.
++
++  - BlackLevelCorrectionLevels:
++      type: int32_t
++      description: |
++        Black levels correction of the Red, Green and Blue colour channels, in
++        that order.
++      size: [3]
++
++  - DemosaicingFilter:
++      type: int32_t
++      description: |
++        Demosaicing filter parameters (strength of the detection) to adapt to
++        specific shapes in this order: Peak, Vertical line, Horizontal line,
++        Edge
++      size: [4]
++
++  - ContrastLuminanceEnable:
++      type: bool
++      description: |
++        ContrastLuminance feature enable status.
++
++  - ContrastLuminance:
++      type: int32_t
++      description: |
++        Luminance amplification factor table for preset luminance segments.
++        Entry 0 is for pixel with luminance of 0, entry 1 is for pixel with
++        luminance of 32, ..., entry 8 is for pixel with luminance of 256.
++        Unit = 100 for "x1.0", 150 for "x1.5".
++      size: [9]
++
++  - IspDecimationRatio:
++      type: int32_t
++      description: |
++        ISP decimation ratio. This control can only be returned in metadata.
++
++  - StatisticArea:
++      type: Rectangle
++      description: |
++        Area defining where the statistics are extracted within the frame.
++        If not defined, the statistics are extracted within the whole frame.
++
++  - StatisticProfile:
++      type: int32_t
++      description: |
++        Defines which statistics are reported.
++      enum:
++        - name: Full
++          value: 0
++          description: |
++            Bins and Average on Up and Down location are reported. The ISP needs
++            several VSYNC cycles to report such statistics.
++        - name: AverageUp
++          value: 1
++          description: Only Average on Up location are reported (fast report).
++        - name: AverageDown
++          value: 2
++          description: Only Average on Down location are reported (fast report).
++
++  - StatisticAverageUp:
++      type: int32_t
++      description: |
++        Reported average value (from 0 to 255) measured at the up part of the
++        ISP pipeline. Red, Green, Blue colour channels and Luminance in that
++        order.
++      size: [4]
++
++  - StatisticAverageDown:
++      type: int32_t
++      description: |
++        Reported average value (from 0 to 255) measured at the down part of the
++        ISP pipeline. Red, Green, Blue colour channels and Luminance in that
++        order.
++      size: [4]
++
++  - StatisticBinsUp:
++      type: int32_t
++      description: |
++        Reported bins (number of pixels in one of the 12 ranges of luminance)
++        measured at the up part of the ISP pipeline.
++      size: [12]
++
++  - StatisticBinsDown:
++      type: int32_t
++      description: |
++        Reported bins (number of pixels in one of the 12 ranges of luminance)
++        measured at the up part of the ISP pipeline.
++      size: [12]
++
++  - SensorBitsPerPixel:
++      type: int32_t
++      description: |
++        Number of bits per pixel of the sensor.
++        This control can only be returned in metadata.
++
++  - PipelineHwRevision:
++      type: int32_t
++      description: |
++        IPA hardware revision identifier.
++
+ ...
+diff --git a/src/libcamera/ipc_unixsocket.cpp b/src/libcamera/ipc_unixsocket.cpp
+index 0163deed..75285b67 100644
+--- a/src/libcamera/ipc_unixsocket.cpp
++++ b/src/libcamera/ipc_unixsocket.cpp
+@@ -8,7 +8,6 @@
+ #include "libcamera/internal/ipc_unixsocket.h"
+ 
+ #include <array>
+-#include <cstdint>
+ #include <poll.h>
+ #include <string.h>
+ #include <sys/socket.h>
+@@ -248,8 +247,8 @@ int IPCUnixSocket::sendData(const void *buffer, size_t length,
+ 	iov[0].iov_base = const_cast<void *>(buffer);
+ 	iov[0].iov_len = length;
+ 
+-	char *buf = (char*)malloc(CMSG_SPACE(num * sizeof(uint32_t)));
+-	memset((void*)buf, 0, sizeof(buf));
++	char buf[CMSG_SPACE(num * sizeof(uint32_t))];
++	memset(buf, 0, sizeof(buf));
+ 
+ 	struct cmsghdr *cmsg = (struct cmsghdr *)buf;
+ 	cmsg->cmsg_len = CMSG_LEN(num * sizeof(uint32_t));
+@@ -271,11 +270,9 @@ int IPCUnixSocket::sendData(const void *buffer, size_t length,
+ 		int ret = -errno;
+ 		LOG(IPCUnixSocket, Error)
+ 			<< "Failed to sendmsg: " << strerror(-ret);
+-		free(buf);
+ 		return ret;
+ 	}
+ 
+-	free(buf);
+ 	return 0;
+ }
+ 
+@@ -286,8 +283,8 @@ int IPCUnixSocket::recvData(void *buffer, size_t length,
+ 	iov[0].iov_base = buffer;
+ 	iov[0].iov_len = length;
+ 
+-	char *buf = (char*)malloc(CMSG_SPACE(num * sizeof(uint32_t)));
+-	memset((void*)buf, 0, sizeof(buf));
++	char buf[CMSG_SPACE(num * sizeof(uint32_t))];
++	memset(buf, 0, sizeof(buf));
+ 
+ 	struct cmsghdr *cmsg = (struct cmsghdr *)buf;
+ 	cmsg->cmsg_len = CMSG_LEN(num * sizeof(uint32_t));
+@@ -308,14 +305,12 @@ int IPCUnixSocket::recvData(void *buffer, size_t length,
+ 		if (ret != -EAGAIN)
+ 			LOG(IPCUnixSocket, Error)
+ 				<< "Failed to recvmsg: " << strerror(-ret);
+-		free(buf);
+ 		return ret;
+ 	}
+ 
+ 	if (fds)
+ 		memcpy(fds, CMSG_DATA(cmsg), num * sizeof(uint32_t));
+ 
+-	free(buf);
+ 	return 0;
+ }
+ 
+diff --git a/src/libcamera/media_device.cpp b/src/libcamera/media_device.cpp
+index 04f40132..bd054552 100644
+--- a/src/libcamera/media_device.cpp
++++ b/src/libcamera/media_device.cpp
+@@ -159,12 +159,12 @@ bool MediaDevice::lock()
+  *
+  * \sa lock()
+  */
+-bool MediaDevice::unlock()
++void MediaDevice::unlock()
+ {
+ 	if (!fd_.isValid())
+-		return false;
++		return;
+ 
+-	return lockf(fd_.get(), F_ULOCK, 0) == 0;
++	lockf(fd_.get(), F_ULOCK, 0);
+ }
+ 
+ /**
+diff --git a/src/libcamera/pipeline/dcmipp/dcmipp.cpp b/src/libcamera/pipeline/dcmipp/dcmipp.cpp
+new file mode 100644
+index 00000000..ec9abdd2
+--- /dev/null
++++ b/src/libcamera/pipeline/dcmipp/dcmipp.cpp
+@@ -0,0 +1,1311 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++/*
++ * Copyright (C) 2024, ST Microelectronics
++ *
++ * dcmipp.cpp - Pipeline handler for the stm32 DCMIPP device
++ * Originally based on the vimc pipeline handler
++ */
++
++#include <algorithm>
++#include <iomanip>
++#include <map>
++#include <math.h>
++#include <tuple>
++
++#include <linux/media-bus-format.h>
++#include <linux/version.h>
++
++#include <libcamera/base/log.h>
++#include <libcamera/base/utils.h>
++
++#include <libcamera/camera.h>
++#include <libcamera/control_ids.h>
++#include <libcamera/controls.h>
++#include <libcamera/formats.h>
++#include <libcamera/request.h>
++#include <libcamera/stream.h>
++
++#include <libcamera/ipa/dcmipp_ipa_interface.h>
++#include <libcamera/ipa/dcmipp_ipa_proxy.h>
++#include <libcamera/ipa/ipa_interface.h>
++#include <libcamera/ipa/ipa_module_info.h>
++
++#include "libcamera/internal/camera.h"
++#include "libcamera/internal/camera_sensor.h"
++#include "libcamera/internal/device_enumerator.h"
++#include "libcamera/internal/framebuffer.h"
++#include "libcamera/internal/ipa_manager.h"
++#include "libcamera/internal/media_device.h"
++#include "libcamera/internal/pipeline_handler.h"
++#include "libcamera/internal/v4l2_subdevice.h"
++#include "libcamera/internal/v4l2_videodevice.h"
++
++#include "linux/stm32-dcmipp-config.h"
++#include "dcmipp.h"
++
++namespace libcamera {
++
++LOG_DEFINE_CATEGORY(DCMIPP)
++
++class PipelineHandlerDcmipp;
++class DcmippCameraData;
++
++struct DcmippFrameInfo {
++	unsigned int frame;
++	Request *request;
++
++	FrameBuffer *dumpPathBuffer;
++	FrameBuffer *mainPathBuffer;
++	FrameBuffer *auxPathBuffer;
++
++	FrameBuffer *statsBuffer;
++
++	bool metadataProcessed;
++};
++
++class DcmippFrames
++{
++public:
++	DcmippFrames(PipelineHandler *pipe);
++
++	DcmippFrameInfo *create(const DcmippCameraData *data, Request *request);
++	int destroy(unsigned int frame);
++	void clear();
++
++	DcmippFrameInfo *find(unsigned int frame);
++	DcmippFrameInfo *find(FrameBuffer *buffer);
++
++private:
++	PipelineHandlerDcmipp *pipe_;
++	std::map<unsigned int, DcmippFrameInfo *> frameInfo_;
++};
++
++class DcmippCameraData : public Camera::Private
++{
++public:
++	DcmippCameraData(PipelineHandler *pipe, DcmippDumpPath *dumpPath,
++			 DcmippMainPath *mainPath, DcmippAuxPath *auxPath)
++		: Camera::Private(pipe), dumpPath_(dumpPath),
++		  mainPath_(mainPath), auxPath_(auxPath), frameInfo_(pipe)
++	{
++	}
++
++	PipelineHandlerDcmipp *pipe();
++
++	void paramsFilled(unsigned int id);
++	void statsFreed(unsigned int id);
++	void metadataReady(unsigned int frame, const ControlList &metadata);
++	void setSensorControls(unsigned int id, const ControlList &sensorControls);
++	void setIspControls(unsigned int id, const ControlList &ispControls);
++
++	std::unique_ptr<CameraSensor> sensor_;
++	std::unique_ptr<V4L2Subdevice> input_;
++	Stream Dumpstream_;
++	Stream Mainstream_;
++	Stream Auxstream_;
++
++	DcmippDumpPath *dumpPath_;
++	DcmippMainPath *mainPath_;
++	DcmippAuxPath *auxPath_;
++
++	std::vector<IPABuffer> ipaBuffers_;
++	std::unique_ptr<ipa::dcmipp::IPAProxyDcmipp> ipa_;
++	DcmippFrames frameInfo_;
++
++	std::queue<Request *> requests_;
++};
++
++class DcmippCameraConfiguration : public CameraConfiguration
++{
++public:
++	DcmippCameraConfiguration(DcmippCameraData *data);
++
++	Status validate() override;
++
++	const V4L2SubdeviceFormat &sensorFormat() { return sensorFormat_; }
++
++	/*
++	 * Indicate if gamma correction should be enabled on the corresponding
++	 * stream
++	 */
++	bool gamma_correction[3];
++
++private:
++	bool fitsAllPaths(const StreamConfiguration &cfg);
++
++	DcmippCameraData *data_;
++	V4L2SubdeviceFormat sensorFormat_;
++};
++
++class PipelineHandlerDcmipp : public PipelineHandler
++{
++public:
++	PipelineHandlerDcmipp(CameraManager *manager);
++
++	std::unique_ptr<CameraConfiguration> generateConfiguration(Camera *camera,
++								   Span<const StreamRole> roles) override;
++	int configure(Camera *camera, CameraConfiguration *config) override;
++
++	int exportFrameBuffers(Camera *camera, Stream *stream,
++			       std::vector<std::unique_ptr<FrameBuffer>> *buffers) override;
++
++	int start(Camera *camera, const ControlList *controls) override;
++	void stopDevice(Camera *camera) override;
++
++	int queueRequestDevice(Camera *camera, Request *request) override;
++
++	bool match(DeviceEnumerator *enumerator) override;
++
++private:
++	int init(std::unique_ptr<DcmippCameraData> &data);
++
++	DcmippCameraData *cameraData(Camera *camera)
++	{
++		return static_cast<DcmippCameraData *>(camera->_d());
++	}
++
++	friend DcmippCameraData;
++	friend DcmippCameraConfiguration;
++
++	int allocateBuffers(Camera *camera);
++	int freeBuffers(Camera *camera);
++
++	void bufferReady(FrameBuffer *buffer);
++	void statsReady(FrameBuffer *buffer);
++	void paramsReady(FrameBuffer *buffer);
++
++	DcmippDumpPath dumpPath_;
++	DcmippMainPath mainPath_;
++	DcmippAuxPath auxPath_;
++
++	MediaDevice *media_;
++	std::unique_ptr<V4L2Subdevice> bridge_;
++	std::unique_ptr<V4L2Subdevice> input_;
++
++	std::unique_ptr<V4L2VideoDevice> params_;
++	std::unique_ptr<V4L2VideoDevice> stats_;
++
++	std::vector<std::unique_ptr<FrameBuffer>> isp_params_;
++	std::queue<FrameBuffer *> available_isp_params_;
++	std::vector<std::unique_ptr<FrameBuffer>> isp_stats_;
++	std::queue<FrameBuffer *> available_isp_stats_;
++
++	void tryCompleteRequest(DcmippFrameInfo *info);
++
++	Camera *activeCamera_;
++};
++
++namespace {
++
++static const std::map<PixelFormat, uint32_t> rawFormatToMediaBus{
++	{ formats::SBGGR8, MEDIA_BUS_FMT_SBGGR8_1X8 },
++	{ formats::SGBRG8, MEDIA_BUS_FMT_SGBRG8_1X8 },
++	{ formats::SGRBG8, MEDIA_BUS_FMT_SGRBG8_1X8 },
++	{ formats::SRGGB8, MEDIA_BUS_FMT_SRGGB8_1X8 },
++	{ formats::SBGGR10, MEDIA_BUS_FMT_SBGGR10_1X10 },
++	{ formats::SGBRG10, MEDIA_BUS_FMT_SGBRG10_1X10 },
++	{ formats::SGRBG10, MEDIA_BUS_FMT_SGRBG10_1X10 },
++	{ formats::SRGGB10, MEDIA_BUS_FMT_SRGGB10_1X10 },
++	{ formats::SBGGR12, MEDIA_BUS_FMT_SBGGR12_1X12 },
++	{ formats::SGBRG12, MEDIA_BUS_FMT_SGBRG12_1X12 },
++	{ formats::SGRBG12, MEDIA_BUS_FMT_SGRBG12_1X12 },
++	{ formats::SRGGB12, MEDIA_BUS_FMT_SRGGB12_1X12 },
++	{ formats::SBGGR14, MEDIA_BUS_FMT_SBGGR14_1X14 },
++	{ formats::SGBRG14, MEDIA_BUS_FMT_SGBRG14_1X14 },
++	{ formats::SGRBG14, MEDIA_BUS_FMT_SGRBG14_1X14 },
++	{ formats::SRGGB14, MEDIA_BUS_FMT_SRGGB14_1X14 },
++};
++
++} /* namespace */
++
++DcmippFrames::DcmippFrames(PipelineHandler *pipe)
++	: pipe_(static_cast<PipelineHandlerDcmipp *>(pipe))
++{
++}
++
++DcmippFrameInfo *DcmippFrames::create(const DcmippCameraData *data, Request *request)
++{
++	FrameBuffer *dumpPathBuffer = nullptr;
++	FrameBuffer *mainPathBuffer = nullptr;
++	FrameBuffer *auxPathBuffer = nullptr;
++
++	if (data->dumpPath_->isEnabled()) {
++		dumpPathBuffer = request->findBuffer(&data->Dumpstream_);
++		if (!dumpPathBuffer) {
++			LOG(DCMIPP, Error) << "Attempt to queue request with invalid stream";
++			return nullptr;
++		}
++	}
++
++	if (data->mainPath_->isEnabled()) {
++		mainPathBuffer = request->findBuffer(&data->Mainstream_);
++		if (!mainPathBuffer) {
++			LOG(DCMIPP, Error) << "Attempt to queue request with invalid stream";
++			return nullptr;
++		}
++	}
++
++	if (data->auxPath_->isEnabled()) {
++		auxPathBuffer = request->findBuffer(&data->Auxstream_);
++		if (!auxPathBuffer) {
++			LOG(DCMIPP, Error) << "Attempt to queue request with invalid stream";
++			return nullptr;
++		}
++	}
++
++	DcmippFrameInfo *info = new DcmippFrameInfo;
++
++	info->frame = request->sequence();
++	info->request = request;
++	info->dumpPathBuffer = dumpPathBuffer;
++	info->mainPathBuffer = mainPathBuffer;
++	info->auxPathBuffer = auxPathBuffer;
++
++	info->statsBuffer = nullptr;
++	info->metadataProcessed = false;
++
++	frameInfo_[info->frame] = info;
++
++	return info;
++}
++
++int DcmippFrames::destroy(unsigned int frame)
++{
++	DcmippFrameInfo *info = find(frame);
++	if (!info)
++		return -ENOENT;
++
++	frameInfo_.erase(info->frame);
++
++	delete info;
++
++	return 0;
++}
++
++void DcmippFrames::clear()
++{
++	for (const auto &entry : frameInfo_) {
++		DcmippFrameInfo *info = entry.second;
++
++		delete info;
++	}
++
++	frameInfo_.clear();
++}
++
++DcmippFrameInfo *DcmippFrames::find(unsigned int frame)
++{
++	auto itInfo = frameInfo_.find(frame);
++
++	if (itInfo != frameInfo_.end())
++		return itInfo->second;
++
++	LOG(DCMIPP, Error) << "Frame #" << frame << " unknown in frameInfo list";
++
++	return nullptr;
++}
++
++DcmippFrameInfo *DcmippFrames::find(FrameBuffer *buffer)
++{
++	for (auto &itInfo : frameInfo_) {
++		DcmippFrameInfo *info = itInfo.second;
++
++		if (info->dumpPathBuffer == buffer ||
++		    info->mainPathBuffer == buffer ||
++		    info->auxPathBuffer == buffer ||
++		    info->statsBuffer == buffer)
++			return info;
++	}
++
++	LOG(DCMIPP, Error) << "FrameBuffer " << buffer << " unknown in frameInfo list";
++
++	return nullptr;
++}
++
++DcmippCameraConfiguration::DcmippCameraConfiguration(DcmippCameraData *data)
++	: CameraConfiguration(), data_(data)
++{
++}
++
++bool DcmippCameraConfiguration::fitsAllPaths(const StreamConfiguration &cfg)
++{
++	const CameraSensor *sensor = data_->sensor_.get();
++	StreamConfiguration config;
++	unsigned int isp_decimation_ratio = 0;
++
++	/*
++	 * We only check for non-RAW configuration using Main / Aux pipes since anyway
++	 * we dedicate the Dump pipe for RAW
++	 */
++	if (PixelFormatInfo::info(cfg.pixelFormat).colourEncoding == PixelFormatInfo::ColourEncodingRAW)
++		return false;
++
++	config = cfg;
++	if (data_->mainPath_->validate(sensor, &config, &isp_decimation_ratio) != Valid)
++		return false;
++
++	config = cfg;
++	if (data_->auxPath_->validate(sensor, &config, &isp_decimation_ratio) != Valid)
++		return false;
++
++	return true;
++}
++
++CameraConfiguration::Status DcmippCameraConfiguration::validate()
++{
++	const CameraSensor *sensor = data_->sensor_.get();
++	PipelineHandlerDcmipp *pipe =
++		static_cast<PipelineHandlerDcmipp *>(data_->pipe());
++	unsigned int isp_decimation_ratio = 0;
++	V4L2SubdeviceFormat sensorFormat;
++	Status status = Valid;
++
++	/*
++	 * List of RAW formats supported by the input subdevice
++	 * sorted from the best quality to the lowest quality so
++	 * that the pipeline handler will pick up the best quality
++	 * possible by both sensor & dcmipp
++	 */
++	const std::vector<unsigned int> mbusRAWInputCodes = {
++		MEDIA_BUS_FMT_SRGGB14_1X14,
++		MEDIA_BUS_FMT_SGRBG14_1X14,
++		MEDIA_BUS_FMT_SGBRG14_1X14,
++		MEDIA_BUS_FMT_SBGGR14_1X14,
++		MEDIA_BUS_FMT_SRGGB12_1X12,
++		MEDIA_BUS_FMT_SGRBG12_1X12,
++		MEDIA_BUS_FMT_SGBRG12_1X12,
++		MEDIA_BUS_FMT_SBGGR12_1X12,
++		MEDIA_BUS_FMT_SRGGB10_1X10,
++		MEDIA_BUS_FMT_SGRBG10_1X10,
++		MEDIA_BUS_FMT_SGBRG10_1X10,
++		MEDIA_BUS_FMT_SBGGR10_1X10,
++		MEDIA_BUS_FMT_SRGGB8_1X8,
++		MEDIA_BUS_FMT_SGRBG8_1X8,
++		MEDIA_BUS_FMT_SGBRG8_1X8,
++		MEDIA_BUS_FMT_SBGGR8_1X8,
++	};
++
++	LOG(DCMIPP, Debug) << "validate";
++
++	if (config_.empty())
++		return Invalid;
++
++	/* Cap the number of entries to the available streams. */
++	if (config_.size() > 3) {
++		config_.resize(3);
++		status = Adjusted;
++	}
++
++	/*
++	 * Reorder the list of streams based on compatibility with pipes.  Evaluate first
++	 * streams that cannot work on all pipes.  Create an order list, and push at the
++	 * back of the list pipes that can run on both main & aux pipes
++	 */
++	std::vector<unsigned int> order;
++	order.reserve(config_.size());
++	for (unsigned int index = 0; index < config_.size(); index++) {
++		if (fitsAllPaths(config_[index]))
++			order.emplace(order.end(), index);
++		else
++			order.emplace(order.begin(), index);
++	}
++
++	/* Pick a pipe and validate each configuration */
++	bool dumpAllocated = false, mainAllocated = false, auxAllocated = false;
++	for (unsigned int index : order) {
++		StreamConfiguration &cfg = config_[index];
++		DcmippPath *path;
++		Stream *stream;
++
++		if (PixelFormatInfo::info(cfg.pixelFormat).colourEncoding == PixelFormatInfo::ColourEncodingRAW) {
++			if (dumpAllocated) {
++				LOG(DCMIPP, Error) << "Cannot perform RAW capture since Dump pipe already allocated";
++				return Invalid;
++			}
++			LOG(DCMIPP, Debug) << "Select Dump pipe for config: pixelformat: " << cfg.pixelFormat << " size: " << cfg.size;
++			path = &pipe->dumpPath_;
++			stream = &data_->Dumpstream_;
++			dumpAllocated = true;
++		} else {
++			if (!mainAllocated) {
++				LOG(DCMIPP, Debug) << "Select Main pipe for config: pixelformat: " << cfg.pixelFormat << " size: " << cfg.size;
++				path = &pipe->mainPath_;
++				stream = &data_->Mainstream_;
++				mainAllocated = true;
++			} else if (!auxAllocated) {
++				LOG(DCMIPP, Debug) << "Select Aux pipe for config: pixelformat: " << cfg.pixelFormat << " size: " << cfg.size;
++				path = &pipe->auxPath_;
++				stream = &data_->Auxstream_;
++				auxAllocated = true;
++			} else {
++				LOG(DCMIPP, Error) << "No more pipe available";
++				return Invalid;
++			}
++		}
++
++		StreamConfiguration tryCfg = cfg;
++		if (path->validate(sensor, &tryCfg, &isp_decimation_ratio) != Valid)
++			return Invalid;
++
++		cfg = std::move(tryCfg);
++		cfg.setStream(stream);
++
++		/* If we have validate a RAW format, this should be the sensor format */
++		if (PixelFormatInfo::info(cfg.pixelFormat).colourEncoding == PixelFormatInfo::ColourEncodingRAW) {
++			/* Check that the format is supported */
++			if (rawFormatToMediaBus.find(cfg.pixelFormat) == rawFormatToMediaBus.end()) {
++				LOG(DCMIPP, Debug) << "Format " << cfg.pixelFormat << " not supported";
++				return Invalid;
++			}
++
++			sensorFormat.code = rawFormatToMediaBus.find(cfg.pixelFormat)->second;
++			sensorFormat.size = sensor->resolution();
++		}
++	}
++
++	/* If we haven't got yet a sensorFormat, then pick the best one for us */
++	if (sensorFormat.size.isNull()) {
++		sensorFormat = sensor->getFormat(mbusRAWInputCodes, sensor->resolution());
++		if (sensorFormat.size.isNull()) {
++			LOG(DCMIPP, Debug) << __func__ << "Failed to get compatible RAW format";
++			return Invalid;
++		}
++	}
++
++	LOG(DCMIPP, Debug) << __func__ << " sensor MBUS format is " << sensorFormat.code << "/" << sensorFormat.size;
++	sensorFormat_ = sensorFormat;
++
++	return status;
++}
++
++PipelineHandlerDcmipp::PipelineHandlerDcmipp(CameraManager *manager)
++	: PipelineHandler(manager), media_(nullptr), activeCamera_(nullptr)
++{
++}
++
++std::unique_ptr<CameraConfiguration>
++PipelineHandlerDcmipp::generateConfiguration(Camera *camera,
++					     Span<const StreamRole> roles)
++{
++	DcmippCameraData *data = cameraData(camera);
++	std::unique_ptr<CameraConfiguration> config =
++		std::make_unique<DcmippCameraConfiguration>(data);
++	DcmippCameraConfiguration *dcmipp_config =
++		static_cast<DcmippCameraConfiguration *>(config.get());
++	bool dumpAllocated = false, mainAllocated = false, auxAllocated = false;
++	int i = 0;
++
++	LOG(DCMIPP, Debug) << "generateConfiguration";
++
++	/* It is allowed to not indicate a role, in which case we return a empty config */
++	if (roles.empty())
++		return config;
++
++	/* DCMIPP can handle a maximum of 3 streams */
++	if (roles.size() > 3) {
++		LOG(DCMIPP, Error) << "More streams requested than supported";
++		return nullptr;
++	}
++
++	/*
++	 * We can allocate pipes depending on the role since preferred configuration for
++	 * each role define the pipe to be used due to their HW capabilities
++	 *
++	 * StillCapture: targetting best image, with JPEG output via SW encoder behind hence
++	 * 		 YUV420 Planar format.  That is MEDIA_BUS_FMT_UYVY8_1_5X8 in DCMIPP
++	 * 		 driver and V4L2_PIX_FMT_YUV420.
++	 * 		 This is exclusively done via the Main pipe.
++	 * Viewfinder: targetting a display, hence limited size of the image to fit into the
++	 * 	       display and xRGB32 output (for the time being we use RGB888 instead.
++	 * 	       Hence MEDIA_BUS_FMT_RGB888_1X24 and V4L2_PIX_FMT_RGB24.
++	 * 	       This can be done by both Main & Aux pipe however we use Aux pipe here.
++	 * VideoRecording: targetting a video encoder with a maximum resolution of HD.
++	 * 		   Hence MEDIA_BUS_FMT_YUYV8_1_5X8 and V4L2_PIX_FMT_NV12.
++	 * 		   This is exclusively done via the Main pipe.
++	 * Raw: targetting RawBayer extraction of the image from a sensor. Format depends on
++	 *      the format of the sensor. This is only done by the Dump pipe.
++	 */
++	for (const StreamRole role : roles) {
++		DcmippPath *path;
++		Size maxSize;
++		PixelFormat pixelFormat;
++
++		dcmipp_config->gamma_correction[i] = false;
++
++		switch (role) {
++		case StreamRole::StillCapture:
++			maxSize = data->sensor_->resolution();
++			pixelFormat = formats::YUV420;
++			if (mainAllocated) {
++				LOG(DCMIPP, Error) << "Main pipe already allocated, ABORT";
++				return nullptr;
++			}
++			path = data->mainPath_;
++			mainAllocated = true;
++			break;
++		case StreamRole::Viewfinder:
++			maxSize = { 1024, 600 };
++			pixelFormat = formats::RGB888;
++			dcmipp_config->gamma_correction[i] = true;
++			if (auxAllocated) {
++				LOG(DCMIPP, Error) << "Aux pipe already allocated, ABORT";
++				return nullptr;
++			}
++			path = data->auxPath_;
++			auxAllocated = true;
++			break;
++		case StreamRole::VideoRecording:
++			maxSize = { 1920, 1080 };
++			pixelFormat = formats::NV12;
++			if (mainAllocated) {
++				LOG(DCMIPP, Error) << "Main pipe already allocated, ABORT";
++				return nullptr;
++			}
++			path = data->mainPath_;
++			mainAllocated = true;
++			break;
++		case StreamRole::Raw:
++			maxSize = data->sensor_->resolution();
++			/*
++			 * In case of Raw role, the pixelFormat is actually given by the
++			 * dcmipp_path generateConfiguration since it depends on sensor format
++			 */
++			pixelFormat = formats::SBGGR8;
++			if (dumpAllocated) {
++				LOG(DCMIPP, Error) << "Dump pipe already allocated, ABORT";
++				return nullptr;
++			}
++			path = data->dumpPath_;
++			dumpAllocated = true;
++			break;
++		default:
++			LOG(DCMIPP, Error) << "Requested stream role not supported: " << roles[0];
++			return nullptr;
++		}
++
++		/*
++		 * role is given here mainly for the ViewFinder role case since we need to figure
++		 * out a way to indicate that we need to enable the GammaCorrection
++		 */
++		StreamConfiguration cfg =
++			path->generateConfiguration(data->sensor_.get(), maxSize, pixelFormat);
++		if (!cfg.pixelFormat.isValid())
++			return nullptr;
++
++		config->addConfiguration(cfg);
++		i++;
++	}
++
++	config->validate();
++
++	return config;
++}
++
++int PipelineHandlerDcmipp::configure(Camera *camera, CameraConfiguration *c)
++{
++	DcmippCameraConfiguration *config =
++		static_cast<DcmippCameraConfiguration *>(c);
++	DcmippCameraData *data = cameraData(camera);
++	int ret, i = 0;
++
++	LOG(DCMIPP, Debug) << "configure";
++
++	/* Disable all paths */
++	dumpPath_.setEnabled(false);
++	mainPath_.setEnabled(false);
++	auxPath_.setEnabled(false);
++
++	/*
++	 * Only enable the relevant link between dcmipp_input and its
++	 * source entity (bridge or sensor)
++	 */
++	const MediaEntity *source;
++	if (bridge_)
++		source = bridge_->entity();
++	else
++		source = data->sensor_->entity();
++
++	const MediaPad *input_sinkPad = data->input_->entity()->getPadByIndex(0);
++	for (MediaLink *link : input_sinkPad->links()) {
++		if (link->source()->entity()->name().compare(source->name()))
++			link->setEnabled(false);
++		else
++			link->setEnabled(true);
++	}
++
++	/* Get the sensor configuration and apply it */
++	V4L2SubdeviceFormat subformat = config->sensorFormat();
++	ret = data->sensor_->setFormat(&subformat);
++	if (ret)
++		return ret;
++
++	/* Same configuration on both side of the bridge */
++	if (bridge_) {
++		ret = bridge_->setFormat(0, &subformat);
++		if (ret)
++			return ret;
++		ret = bridge_->setFormat(1, &subformat);
++		if (ret)
++			return ret;
++	}
++
++	/* Initialize links after input depending on the config */
++	for (const StreamConfiguration &cfg : *config) {
++		if (cfg.stream() == &data->Dumpstream_)
++			ret = dumpPath_.setEnabled(true);
++		else if (cfg.stream() == &data->Mainstream_)
++			ret = mainPath_.setEnabled(true);
++		else if (cfg.stream() == &data->Auxstream_)
++			ret = auxPath_.setEnabled(true);
++	}
++
++	/* Same configuration on both side of the input subdev */
++	ret = input_->setFormat(0, &subformat);
++	if (ret)
++		return ret;
++
++	/* Configuration of each path */
++	for (const StreamConfiguration &cfg : *config) {
++		bool gamma_correction = config->gamma_correction[i];
++		if (cfg.stream() == &data->Dumpstream_)
++			ret = dumpPath_.configure(cfg, subformat, gamma_correction);
++		else if (cfg.stream() == &data->Mainstream_)
++			ret = mainPath_.configure(cfg, subformat, gamma_correction);
++		else if (cfg.stream() == &data->Auxstream_)
++			ret = auxPath_.configure(cfg, subformat, gamma_correction);
++		if (ret) {
++			LOG(DCMIPP, Error) << "Failed to configure path";
++			return ret;
++		}
++	}
++
++	/* Configure the IPA if we have one and use Main or Aux paths */
++	if (data->ipa_ && (data->mainPath_->isEnabled() || data->auxPath_->isEnabled())) {
++		/* Configure the param & stat video devices */
++		V4L2DeviceFormat paramFormat;
++		paramFormat.fourcc = V4L2PixelFormat(V4L2_META_FMT_ST_DCMIPP_ISP_PARAMS);
++		ret = params_->setFormat(&paramFormat);
++		if (ret)
++			return ret;
++
++		V4L2DeviceFormat statFormat;
++		statFormat.fourcc = V4L2PixelFormat(V4L2_META_FMT_ST_DCMIPP_ISP_STAT);
++		ret = stats_->setFormat(&statFormat);
++		if (ret)
++			return ret;
++
++		/* Disable the stat region by default */
++		struct v4l2_ctrl_isp_stat_region region;
++
++		region.nb_regions = 0;
++
++		ControlValue ctrl(Span<const uint8_t>{ reinterpret_cast<uint8_t *>(&region), sizeof(region) });
++		ControlList statAreaControl;
++		statAreaControl.set(V4L2_CID_ISP_STAT_REGION, ctrl);
++		ret = stats_->setControls(&statAreaControl);
++		if (ret) {
++			LOG(DCMIPP, Error) << "Failed to set control of ISP Stat Area";
++			return ret;
++		}
++
++		/*
++		 * Inform IPA of sensor controls. IPA will update
++		 * data->controlInfo_ which specifies the list of controls supported by the camera.
++		 */
++		IPACameraSensorInfo sensorInfo;
++		data->sensor_->sensorInfo(&sensorInfo);
++
++		ret = data->ipa_->configure(sensorInfo, data->sensor_->controls(),
++					    data->mainPath_->ispDecimationRatio(),
++					    &data->controlInfo_);
++		if (ret) {
++			LOG(DCMIPP, Error) << "Failed to configure IPA";
++			return ret;
++		}
++	}
++
++	return 0;
++}
++
++int PipelineHandlerDcmipp::exportFrameBuffers([[maybe_unused]] Camera *camera, Stream *stream,
++					      std::vector<std::unique_ptr<FrameBuffer>> *buffers)
++{
++	DcmippCameraData *data = cameraData(camera);
++	unsigned int count = stream->configuration().bufferCount;
++
++	if (stream == &data->Dumpstream_)
++		return dumpPath_.exportBuffers(count, buffers);
++	else if (stream == &data->Mainstream_)
++		return mainPath_.exportBuffers(count, buffers);
++	else if (stream == &data->Auxstream_)
++		return auxPath_.exportBuffers(count, buffers);
++
++	return -EINVAL;
++}
++
++int PipelineHandlerDcmipp::allocateBuffers(Camera *camera)
++{
++	DcmippCameraData *data = cameraData(camera);
++	unsigned int ipaBufferId = 0;
++	int ret;
++
++	ret = params_->allocateBuffers(DCMIPP_V4L2_STATS_PARAMS_BUFFER_NB, &isp_params_);
++	if (ret < 0)
++		goto error;
++
++	ret = stats_->allocateBuffers(DCMIPP_V4L2_STATS_PARAMS_BUFFER_NB, &isp_stats_);
++	if (ret < 0)
++		goto error;
++
++	for (std::unique_ptr<FrameBuffer> &buffer : isp_stats_) {
++		buffer->setCookie(ipaBufferId++);
++		data->ipaBuffers_.emplace_back(buffer->cookie(), buffer->planes());
++		available_isp_stats_.push(buffer.get());
++	}
++
++	for (std::unique_ptr<FrameBuffer> &buffer : isp_params_) {
++		buffer->setCookie(ipaBufferId++);
++		buffer->_d()->metadata().planes()[0].bytesused = sizeof(struct stm32_dcmipp_params_cfg);
++		data->ipaBuffers_.emplace_back(buffer->cookie(), buffer->planes());
++		available_isp_params_.push(buffer.get());
++	}
++
++	data->ipa_->mapBuffers(data->ipaBuffers_);
++
++	return 0;
++
++error:
++	isp_params_.clear();
++	isp_stats_.clear();
++
++	return ret;
++}
++
++int PipelineHandlerDcmipp::freeBuffers(Camera *camera)
++{
++	DcmippCameraData *data = cameraData(camera);
++
++	while (!available_isp_stats_.empty())
++		available_isp_stats_.pop();
++
++	while (!available_isp_params_.empty())
++		available_isp_params_.pop();
++
++	isp_params_.clear();
++	isp_stats_.clear();
++
++	std::vector<unsigned int> ids;
++	for (IPABuffer &ipabuf : data->ipaBuffers_)
++		ids.push_back(ipabuf.id);
++
++	data->ipa_->unmapBuffers(ids);
++	data->ipaBuffers_.clear();
++
++	params_->releaseBuffers();
++	stats_->releaseBuffers();
++
++	return 0;
++}
++
++int PipelineHandlerDcmipp::start(Camera *camera, [[maybe_unused]] const ControlList *controls)
++{
++	DcmippCameraData *data = cameraData(camera);
++	int ret;
++
++	LOG(DCMIPP, Debug) << "start";
++
++	activeCamera_ = camera;
++
++	if (data->dumpPath_->isEnabled()) {
++		ret = data->dumpPath_->start();
++		if (ret < 0) {
++			LOG(DCMIPP, Error) << "Cannot start bytecapture";
++			return ret;
++		}
++	}
++
++	/* Nothing else to do if there is neither main or aux paths */
++	if (!data->mainPath_->isEnabled() && !data->auxPath_->isEnabled())
++		return 0;
++
++	ret = allocateBuffers(camera);
++	if (ret < 0) {
++		freeBuffers(camera);
++		if (data->dumpPath_->isEnabled())
++			data->dumpPath_->stop();
++		LOG(DCMIPP, Error) << "Cannot allocate stats & params buffers for IPA";
++		return ret;
++	}
++
++	ret = data->ipa_->start();
++	if (ret) {
++		LOG(DCMIPP, Error) << "Cannot start IPA";
++		freeBuffers(camera);
++		if (data->dumpPath_->isEnabled())
++			data->dumpPath_->stop();
++		return ret;
++	}
++
++	if (data->mainPath_->isEnabled()) {
++		ret = data->mainPath_->start();
++		if (ret < 0) {
++			LOG(DCMIPP, Error) << "Cannot start pixelcapture";
++			data->ipa_->stop();
++			freeBuffers(camera);
++			if (data->dumpPath_->isEnabled())
++				data->dumpPath_->stop();
++			return ret;
++		}
++	}
++
++	if (data->auxPath_->isEnabled()) {
++		ret = data->auxPath_->start();
++		if (ret < 0) {
++			LOG(DCMIPP, Error) << "Cannot start pixelcapture";
++			if (data->mainPath_->isEnabled())
++				data->mainPath_->stop();
++			data->ipa_->stop();
++			freeBuffers(camera);
++			if (data->dumpPath_->isEnabled())
++				data->dumpPath_->stop();
++			return ret;
++		}
++	}
++
++	ret = stats_->streamOn();
++	if (ret < 0) {
++		LOG(DCMIPP, Error) << "Cannot start stat buffers";
++		mainPath_.stop();
++		data->ipa_->stop();
++		freeBuffers(camera);
++		if (data->dumpPath_->isEnabled())
++			data->dumpPath_->stop();
++		return ret;
++	}
++
++	ret = params_->streamOn();
++	if (ret < 0) {
++		LOG(DCMIPP, Error) << "Cannot start params buffers";
++		stats_->streamOff();
++		mainPath_.stop();
++		data->ipa_->stop();
++		freeBuffers(camera);
++		if (data->dumpPath_->isEnabled())
++			data->dumpPath_->stop();
++		return ret;
++	}
++
++	return 0;
++}
++
++void PipelineHandlerDcmipp::stopDevice(Camera *camera)
++{
++	DcmippCameraData *data = cameraData(camera);
++
++	LOG(DCMIPP, Debug) << "stop";
++
++	if (data->mainPath_->isEnabled() || data->mainPath_->isEnabled()) {
++		params_->streamOff();
++		stats_->streamOff();
++		if (data->auxPath_->isEnabled())
++			data->auxPath_->stop();
++		if (data->mainPath_->isEnabled())
++			data->mainPath_->stop();
++		data->ipa_->stop();
++		freeBuffers(camera);
++	}
++	if (data->dumpPath_->isEnabled())
++		data->dumpPath_->stop();
++
++	data->frameInfo_.clear();
++
++	activeCamera_ = nullptr;
++}
++
++int PipelineHandlerDcmipp::queueRequestDevice(Camera *camera, Request *request)
++{
++	DcmippCameraData *data = cameraData(camera);
++	FrameBuffer *paramBuffer;
++	int ret;
++
++	LOG(DCMIPP, Debug) << "Function: " << __func__ << " sequence: " << request->sequence();
++
++	DcmippFrameInfo *info = data->frameInfo_.create(data, request);
++	if (!info)
++		return -ENOENT;
++
++	/*
++	 * DCMIPP driver does not output statistics frames from the very beginning.
++	 * This depends on the profile being selected via the STAT_PROFILE control,
++	 * however in order to keep the pipeline handler code simpler, set the longest
++	 * delay here, which leads to libcamera not trying to get statistics from the
++	 * DCMIPP driver during the first requests
++	 */
++	if (!available_isp_stats_.empty() && request->sequence() > DCMIPP_STATS_FRAME_DELAY) {
++		info->statsBuffer = available_isp_stats_.front();
++		available_isp_stats_.pop();
++	}
++
++	if (info->dumpPathBuffer) {
++		ret = data->dumpPath_->queueBuffer(info->dumpPathBuffer);
++		if (ret < 0) {
++			LOG(DCMIPP, Error) << "Can not queue dumpPath buffer";
++			return ret;
++		}
++	}
++
++	/* Nothing else to do if there is neither main or aux paths */
++	if (!info->mainPathBuffer && !info->auxPathBuffer)
++		return 0;
++
++	/* Inform IPA of control update */
++	data->ipa_->queueRequest(request->sequence(), request->controls());
++
++	/* Sends the params buffer to the IPA for filling */
++	if (available_isp_params_.empty()) {
++		LOG(DCMIPP, Error) << "ISP parameters buffer underrun";
++	} else {
++		paramBuffer = available_isp_params_.front();
++		available_isp_params_.pop();
++		data->ipa_->fillParamsBuffer(request->sequence(), paramBuffer->cookie());
++	}
++
++	/* Queue pipeline buffers */
++	if (info->mainPathBuffer) {
++		ret = data->mainPath_->queueBuffer(info->mainPathBuffer);
++		if (ret < 0) {
++			LOG(DCMIPP, Error) << "Can not queue mainPath buffer";
++			return ret;
++		}
++	}
++
++	if (info->auxPathBuffer) {
++		ret = data->auxPath_->queueBuffer(info->auxPathBuffer);
++		if (ret < 0) {
++			LOG(DCMIPP, Error) << "Can not queue auxPath buffer";
++			return ret;
++		}
++	}
++
++	if (info->statsBuffer) {
++		ret = stats_->queueBuffer(info->statsBuffer);
++		if (ret < 0) {
++			LOG(DCMIPP, Error) << "Can not queue ISP stats buffer";
++			return ret;
++		}
++	}
++
++	return 0;
++}
++
++bool PipelineHandlerDcmipp::match(DeviceEnumerator *enumerator)
++{
++	LOG(DCMIPP, Debug) << "match";
++
++	DeviceMatch dm("dcmipp");
++
++	dm.add("dcmipp_input");
++	dm.add("dcmipp_main_isp");
++	dm.add("dcmipp_main_postproc");
++	dm.add("dcmipp_main_capture");
++
++	media_ = acquireMediaDevice(enumerator, dm);
++	if (!media_)
++		return false;
++
++	std::unique_ptr<DcmippCameraData> data = std::make_unique<DcmippCameraData>(this,
++										    &dumpPath_,
++										    &mainPath_,
++										    &auxPath_);
++
++	/* Locate and open all subdevices and video nodes */
++	if (init(data))
++		return false;
++
++	data->ipa_ = IPAManager::createIPA<ipa::dcmipp::IPAProxyDcmipp>(this, 0, 0);
++	if (!data->ipa_) {
++		LOG(DCMIPP, Error) << "no matching IPA found";
++		return false;
++	}
++
++	/* Connect the two event callback from IPA */
++	data->ipa_->paramsBufferReady.connect(data.get(), &DcmippCameraData::paramsFilled);
++	data->ipa_->statsBufferProcessed.connect(data.get(), &DcmippCameraData::statsFreed);
++	data->ipa_->metadataReady.connect(data.get(), &DcmippCameraData::metadataReady);
++	data->ipa_->setSensorControls.connect(data.get(), &DcmippCameraData::setSensorControls);
++	data->ipa_->setIspControls.connect(data.get(), &DcmippCameraData::setIspControls);
++
++	/*
++	 * Initialize IPA. IPA is reponsible for setting data->controlInfo_ which
++	 * specifies the list of controls supported by the camera.
++	 */
++	IPACameraSensorInfo sensorInfo;
++	if (data->sensor_->sensorInfo(&sensorInfo)) {
++		LOG(DCMIPP, Error) << "Camera sensor information not available";
++		return false;
++	}
++
++	/* Tuning file made from sensor name or from environment variable */
++	std::string ipaTuningFile;
++	char const *configFromEnv = utils::secure_getenv("LIBCAMERA_DCMIPP_TUNING_FILE");
++	if (configFromEnv && *configFromEnv != '\0') {
++		ipaTuningFile = std::string(configFromEnv);
++	} else {
++		ipaTuningFile = data->ipa_->configurationFile(data->sensor_->model() + ".yaml");
++	}
++
++	if (data->ipa_->init(IPASettings{ ipaTuningFile, data->sensor_->model() },
++			     media_->hwRevision(), sensorInfo, data->sensor_->controls(),
++			     &data->controlInfo_) < 0) {
++		LOG(DCMIPP, Error) << "IPA initialization failure";
++		return false;
++	}
++
++	/* Create and register the camera. */
++	std::set<Stream *> streams{ &data->Dumpstream_, &data->Mainstream_, &data->Auxstream_ };
++	const std::string &id = data->sensor_->id();
++	std::shared_ptr<Camera> camera =
++		Camera::create(std::move(data), id, streams);
++	registerCamera(std::move(camera));
++
++	return true;
++}
++
++int PipelineHandlerDcmipp::init(std::unique_ptr<DcmippCameraData> &data)
++{
++	const MediaPad *sinkPad;
++	const MediaPad *remotePad;
++
++	LOG(DCMIPP, Debug) << "init";
++
++	input_ = V4L2Subdevice::fromEntityName(media_, "dcmipp_input");
++	if (input_->open())
++		return -ENODEV;
++
++	/* Locate and open the optional CSI-2 receiver */
++	sinkPad = input_->entity()->getPadByIndex(0);
++	if (!sinkPad || sinkPad->links().empty())
++		return false;
++
++	/* Look at links going to input entity sink pad */
++	for (MediaLink *link : sinkPad->links()) {
++		remotePad = link->source();
++		if (remotePad->entity()->function() == MEDIA_ENT_F_VID_IF_BRIDGE) {
++			bridge_ = std::make_unique<V4L2Subdevice>(remotePad->entity());
++			if (bridge_->open())
++				return false;
++
++			sinkPad = bridge_->entity()->getPadByIndex(0);
++			if (!sinkPad || sinkPad->links().empty())
++				return false;
++
++			remotePad = sinkPad->links().at(0)->source();
++		}
++
++		/* Select the sensor which is not the TPG */
++		if (remotePad->entity()->name().compare("dcmipp_tpg"))
++			break;
++	}
++
++	/* Open the sensor subdev */
++	data->sensor_ = std::make_unique<CameraSensor>(remotePad->entity());
++	if (data->sensor_->init())
++		return -ENODEV;
++
++	data->input_ = V4L2Subdevice::fromEntityName(media_, "dcmipp_input");
++	if (data->input_->open() < 0)
++		return -ENODEV;
++
++	/* Initialize all path */
++	if (!dumpPath_.init(media_))
++		return -ENODEV;
++	dumpPath_.bufferReady().connect(this, &PipelineHandlerDcmipp::bufferReady);
++
++	if (!mainPath_.init(media_))
++		return -ENODEV;
++	mainPath_.bufferReady().connect(this, &PipelineHandlerDcmipp::bufferReady);
++
++	if (!auxPath_.init(media_))
++		return -ENODEV;
++	auxPath_.bufferReady().connect(this, &PipelineHandlerDcmipp::bufferReady);
++
++	/* Initialize ISP video devices */
++	params_ = V4L2VideoDevice::fromEntityName(media_, "dcmipp_main_isp_params_output");
++	if (params_->open())
++		return -ENODEV;
++	params_->bufferReady.connect(this, &PipelineHandlerDcmipp::paramsReady);
++
++	stats_ = V4L2VideoDevice::fromEntityName(media_, "dcmipp_main_isp_stat_capture");
++	if (stats_->open())
++		return -ENODEV;
++	stats_->bufferReady.connect(this, &PipelineHandlerDcmipp::statsReady);
++
++	/* Initialize the camera properties. */
++	data->properties_ = data->sensor_->properties();
++
++	return 0;
++}
++
++PipelineHandlerDcmipp *DcmippCameraData::pipe()
++{
++	return static_cast<PipelineHandlerDcmipp *>(Camera::Private::pipe());
++}
++
++void PipelineHandlerDcmipp::tryCompleteRequest(DcmippFrameInfo *info)
++{
++	DcmippCameraData *data = cameraData(activeCamera_);
++	Request *request = info->request;
++
++	LOG(DCMIPP, Debug) << "Function: " << __func__;
++
++	if (request->hasPendingBuffers())
++		return;
++
++	if (info->statsBuffer && !info->metadataProcessed)
++		return;
++
++	data->frameInfo_.destroy(info->frame);
++
++	completeRequest(request);
++}
++
++void PipelineHandlerDcmipp::bufferReady(FrameBuffer *buffer)
++{
++	ASSERT(activeCamera_);
++	DcmippCameraData *data = cameraData(activeCamera_);
++	Request *request = buffer->request();
++
++	LOG(DCMIPP, Debug) << "Function: " << __func__;
++
++	DcmippFrameInfo *info = data->frameInfo_.find(buffer);
++	if (!info)
++		return;
++
++	/* If the buffer is cancelled force a complete of the whole request. */
++	if (buffer->metadata().status == FrameMetadata::FrameCancelled) {
++		for (auto &it : request->buffers()) {
++			FrameBuffer *b = it.second;
++			b->_d()->cancel();
++			completeBuffer(request, b);
++		}
++
++		info->metadataProcessed = true;
++		tryCompleteRequest(info);
++
++		return;
++	}
++
++	/* Record the sensor's timestamp in the request metadata. */
++	request->metadata().set(controls::SensorTimestamp,
++				buffer->metadata().timestamp);
++
++	completeBuffer(request, buffer);
++	tryCompleteRequest(info);
++}
++
++void PipelineHandlerDcmipp::statsReady(FrameBuffer *buffer)
++{
++	ASSERT(activeCamera_);
++	DcmippCameraData *data = cameraData(activeCamera_);
++
++	DcmippFrameInfo *info = data->frameInfo_.find(buffer);
++	if (!info) {
++		LOG(DCMIPP, Error) << "Stats buffer not found";
++		return;
++	}
++
++	LOG(DCMIPP, Debug) << "Function: " << __func__;
++
++	/* Sends the stats buffer to the IPA for analysis */
++	data->ipa_->processStatsBuffer(info->frame, buffer->cookie());
++}
++
++void PipelineHandlerDcmipp::paramsReady(FrameBuffer *buffer)
++{
++	LOG(DCMIPP, Debug) << "Function: " << __func__;
++
++	/* Push this buffer into the available buffer list */
++	available_isp_params_.push(buffer);
++}
++
++void DcmippCameraData::paramsFilled(unsigned int id)
++{
++	PipelineHandlerDcmipp *pipe =
++		static_cast<PipelineHandlerDcmipp *>(Camera::Private::pipe());
++
++	LOG(DCMIPP, Debug) << "Function: " << __func__ << " buffer cookie: " << id;
++
++	/* Search the buffer and queue it back */
++	for (std::unique_ptr<FrameBuffer> &buffer : pipe->isp_params_) {
++		if (buffer.get()->cookie() == id) {
++			if (pipe->params_->queueBuffer(buffer.get()) < 0)
++				LOG(DCMIPP, Error) << "Could not queue back stats buffer";
++			return;
++		}
++	}
++
++	LOG(DCMIPP, Error) << "Could not find params buffer";
++}
++
++void DcmippCameraData::statsFreed(unsigned int id)
++{
++	PipelineHandlerDcmipp *pipe =
++		static_cast<PipelineHandlerDcmipp *>(Camera::Private::pipe());
++
++	LOG(DCMIPP, Debug) << "Function: " << __func__ << " buffer cookie: " << id;
++
++	/* Search the buffer and queue it back */
++	for (std::unique_ptr<FrameBuffer> &buffer : pipe->isp_stats_) {
++		if (buffer.get()->cookie() == id) {
++			pipe->available_isp_stats_.push(buffer.get());
++			return;
++		}
++	}
++
++	LOG(DCMIPP, Error) << "Could not find stats buffer";
++}
++
++void DcmippCameraData::metadataReady(unsigned int frame, const ControlList &metadata)
++{
++	LOG(DCMIPP, Debug) << "Function: " << __func__ << " frame: " << frame;
++
++	DcmippFrameInfo *info = frameInfo_.find(frame);
++	if (!info)
++		return;
++
++	info->request->metadata().merge(metadata);
++	info->metadataProcessed = true;
++
++	pipe()->tryCompleteRequest(info);
++}
++
++void DcmippCameraData::setSensorControls([[maybe_unused]] unsigned int id,
++					 const ControlList &sensorControls)
++{
++	LOG(DCMIPP, Debug) << "Function: " << __func__;
++
++	ControlList ctrls = sensorControls;
++
++	int ret = sensor_->setControls(&ctrls);
++	if (ret)
++		LOG(DCMIPP, Error) << "Failed to set sensor controls: " << ret;
++}
++
++void DcmippCameraData::setIspControls([[maybe_unused]] unsigned int id,
++				      const ControlList &ispControls)
++{
++	PipelineHandlerDcmipp *pipe =
++		static_cast<PipelineHandlerDcmipp *>(Camera::Private::pipe());
++
++	LOG(DCMIPP, Debug) << "Function: " << __func__;
++
++	ControlList ctrls = ispControls;
++
++	int ret = pipe->stats_->setControls(&ctrls);
++	if (ret)
++		LOG(DCMIPP, Error) << "Failed to set ISP controls: " << ret;
++}
++
++REGISTER_PIPELINE_HANDLER(PipelineHandlerDcmipp, "dcmipp")
++
++} /* namespace libcamera */
+diff --git a/src/libcamera/pipeline/dcmipp/dcmipp.h b/src/libcamera/pipeline/dcmipp/dcmipp.h
+new file mode 100644
+index 00000000..6059c70c
+--- /dev/null
++++ b/src/libcamera/pipeline/dcmipp/dcmipp.h
+@@ -0,0 +1,131 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++/*
++ * Copyright (C) 2024, ST Microelectronics
++ *
++ * dcmipp.h - STM32 DCMIPP common definitions
++ */
++
++#pragma once
++
++#include <memory>
++#include <set>
++#include <vector>
++
++#include <libcamera/base/signal.h>
++#include <libcamera/base/span.h>
++
++#include <libcamera/camera.h>
++#include <libcamera/geometry.h>
++#include <libcamera/pixel_format.h>
++
++#include "libcamera/internal/media_object.h"
++#include "libcamera/internal/v4l2_videodevice.h"
++
++namespace libcamera {
++
++class CameraSensor;
++class MediaDevice;
++class V4L2Subdevice;
++struct StreamConfiguration;
++struct V4L2SubdeviceFormat;
++
++class DcmippPath
++{
++public:
++	DcmippPath(const char *name);
++	DcmippPath(const char *name, const Span<const PixelFormat> &formats);
++
++	bool init(MediaDevice *media);
++
++	int setEnabled(bool enable);
++	bool isEnabled() const { return enabled_; }
++
++	StreamConfiguration generateConfiguration(const CameraSensor *sensor,
++						  const Size &maxSize,
++						  PixelFormat rolePixelFormat);
++	CameraConfiguration::Status validate(const CameraSensor *sensor,
++					     StreamConfiguration *cfg,
++					     unsigned int *isp_decimation_ratio);
++
++	int configure(const StreamConfiguration &config,
++		      const V4L2SubdeviceFormat &inputFormat,
++		      bool gamma_correction);
++
++	int exportBuffers(unsigned int bufferCount,
++			  std::vector<std::unique_ptr<FrameBuffer>> *buffers)
++	{
++		return video_->exportBuffers(bufferCount, buffers);
++	}
++
++	int start();
++	void stop();
++
++	int queueBuffer(FrameBuffer *buffer) { return video_->queueBuffer(buffer); }
++	Signal<FrameBuffer *> &bufferReady() { return video_->bufferReady; }
++
++	unsigned int ispDecimationRatio() const { return isp_decimation_ratio_; }
++
++private:
++	void populateFormats();
++
++	static constexpr unsigned int DCMIPP_BUFFER_COUNT = 4;
++
++	const char *name_;
++	bool enabled_;
++	bool running_;
++
++	const Span<const PixelFormat> pathFormats_;
++
++	std::unique_ptr<V4L2Subdevice> input_;
++	std::unique_ptr<V4L2Subdevice> isp_;
++	std::unique_ptr<V4L2Subdevice> postproc_;
++	std::unique_ptr<V4L2VideoDevice> video_;
++
++	unsigned int input_source_pad_;
++
++	MediaLink *link_;
++
++	unsigned int isp_decimation_ratio_;
++};
++
++class DcmippDumpPath : public DcmippPath
++{
++public:
++	DcmippDumpPath();
++};
++
++class DcmippMainPath : public DcmippPath
++{
++public:
++	DcmippMainPath();
++};
++
++class DcmippAuxPath : public DcmippPath
++{
++public:
++	DcmippAuxPath();
++};
++
++} /* namespace libcamera */
++
++#define DCMIPP_V4L2_BUFFER_NB 4
++/* We need one more buffer for stats / params than frame buffers */
++#define DCMIPP_V4L2_STATS_PARAMS_BUFFER_NB (DCMIPP_V4L2_BUFFER_NB + 1)
++
++#define DCMIPP_RAW_MAX_WIDTH 2688
++
++/*
++ * DCMIPP driver does not output statistics frames from the very beginning.
++ * This depends on the profile being selected via the STAT_PROFILE control,
++ * however in order to keep the pipeline handler code simpler, set the longest
++ * delay here, which leads to libcamera not trying to get statistics from the
++ * DCMIPP driver during the first requests
++ */
++#define DCMIPP_STATS_FRAME_DELAY 10
++
++/*
++ * DCMIPP driver doesn't export (yet) the postproc Gamma control CID macro
++ * hence define it here instead
++ * \todo - to be removed once the V4L2_CID is exported by the kernel
++ */
++#define DCMIPP_V4L2_CID_POSTPROC_GAMMA (V4L2_CID_USER_BASE | 0x1001)
+diff --git a/src/libcamera/pipeline/dcmipp/dcmipp_path.cpp b/src/libcamera/pipeline/dcmipp/dcmipp_path.cpp
+new file mode 100644
+index 00000000..36388d65
+--- /dev/null
++++ b/src/libcamera/pipeline/dcmipp/dcmipp_path.cpp
+@@ -0,0 +1,513 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++/*
++ * Copyright (C) 2024, ST Microelectronics
++ *
++ * dcmipp_path.cpp - STM32 DCMIPP path helper
++ * Based on rkisp1_path.cpp
++ */
++
++#include "dcmipp.h"
++
++#include <linux/media-bus-format.h>
++
++#include <libcamera/formats.h>
++#include <libcamera/stream.h>
++
++#include "libcamera/internal/camera_sensor.h"
++#include "libcamera/internal/media_device.h"
++#include "libcamera/internal/v4l2_subdevice.h"
++#include "libcamera/internal/v4l2_videodevice.h"
++
++namespace libcamera {
++
++LOG_DECLARE_CATEGORY(DCMIPP)
++
++namespace {
++
++constexpr std::array<PixelFormat, 27> pixelformats_dump{
++	formats::RGB565,
++	formats::YUYV,
++	formats::YVYU,
++	formats::UYVY,
++	formats::VYUY,
++	formats::R8,
++	formats::SBGGR8,
++	formats::SGBRG8,
++	formats::SGRBG8,
++	formats::SRGGB8,
++	formats::SBGGR10,
++	formats::SGBRG10,
++	formats::SGRBG10,
++	formats::SRGGB10,
++	formats::SBGGR12,
++	formats::SGBRG12,
++	formats::SGRBG12,
++	formats::SRGGB12,
++	formats::SBGGR14,
++	formats::SGBRG14,
++	formats::SGRBG14,
++	formats::SRGGB14,
++	formats::SBGGR16,
++	formats::SGBRG16,
++	formats::SGRBG16,
++	formats::SRGGB16,
++	formats::MJPEG,
++};
++
++constexpr std::array<PixelFormat, 14> pixelformats_main{
++	formats::RGB565,
++	formats::YUYV,
++	formats::YVYU,
++	formats::UYVY,
++	formats::VYUY,
++	formats::R8,
++	formats::RGB888,
++	formats::BGR888,
++	formats::NV12,
++	formats::NV21,
++	formats::NV16,
++	formats::NV61,
++	formats::YUV420,
++	formats::YVU420,
++};
++
++/*
++ * Since we only concentrate on RAW input and AUX doesn't have
++ * RGB to YUV conversion, AUX will only output RGB formats
++ * until we also add support for non-raw sensors.
++ */
++constexpr std::array<PixelFormat, 3> pixelformats_aux{
++	formats::RGB565,
++	formats::RGB888,
++	formats::BGR888,
++};
++
++const std::map<PixelFormat, uint32_t> formatToMediaBus = {
++	{ formats::RGB565, MEDIA_BUS_FMT_RGB888_1X24 },
++	{ formats::YUYV, MEDIA_BUS_FMT_YUV8_1X24 },
++	{ formats::YVYU, MEDIA_BUS_FMT_YUV8_1X24 },
++	{ formats::UYVY, MEDIA_BUS_FMT_YUV8_1X24 },
++	{ formats::VYUY, MEDIA_BUS_FMT_YUV8_1X24 },
++	{ formats::R8, MEDIA_BUS_FMT_YUV8_1X24 },
++	{ formats::RGB888, MEDIA_BUS_FMT_RGB888_1X24 },
++	{ formats::BGR888, MEDIA_BUS_FMT_RGB888_1X24 },
++	{ formats::ARGB8888, MEDIA_BUS_FMT_RGB888_1X24 },
++	{ formats::AVUY8888, MEDIA_BUS_FMT_RGB888_1X24 },
++	{ formats::NV12, MEDIA_BUS_FMT_YUV8_1X24 },
++	{ formats::NV21, MEDIA_BUS_FMT_YUV8_1X24 },
++	{ formats::NV16, MEDIA_BUS_FMT_YUV8_1X24 },
++	{ formats::NV61, MEDIA_BUS_FMT_YUV8_1X24 },
++	{ formats::YUV420, MEDIA_BUS_FMT_YUV8_1X24 },
++	{ formats::YVU420, MEDIA_BUS_FMT_YUV8_1X24 },
++	{ formats::SBGGR8, MEDIA_BUS_FMT_SBGGR8_1X8 },
++	{ formats::SGBRG8, MEDIA_BUS_FMT_SGBRG8_1X8 },
++	{ formats::SGRBG8, MEDIA_BUS_FMT_SGRBG8_1X8 },
++	{ formats::SRGGB8, MEDIA_BUS_FMT_SRGGB8_1X8 },
++	{ formats::SBGGR10, MEDIA_BUS_FMT_SBGGR10_1X10 },
++	{ formats::SGBRG10, MEDIA_BUS_FMT_SGBRG10_1X10 },
++	{ formats::SGRBG10, MEDIA_BUS_FMT_SGRBG10_1X10 },
++	{ formats::SRGGB10, MEDIA_BUS_FMT_SRGGB10_1X10 },
++	{ formats::SBGGR12, MEDIA_BUS_FMT_SBGGR12_1X12 },
++	{ formats::SGBRG12, MEDIA_BUS_FMT_SGBRG12_1X12 },
++	{ formats::SGRBG12, MEDIA_BUS_FMT_SGRBG12_1X12 },
++	{ formats::SRGGB12, MEDIA_BUS_FMT_SRGGB12_1X12 },
++	{ formats::SBGGR14, MEDIA_BUS_FMT_SBGGR14_1X14 },
++	{ formats::SGBRG14, MEDIA_BUS_FMT_SGBRG14_1X14 },
++	{ formats::SGRBG14, MEDIA_BUS_FMT_SGRBG14_1X14 },
++	{ formats::SRGGB14, MEDIA_BUS_FMT_SRGGB14_1X14 },
++	{ formats::SBGGR16, MEDIA_BUS_FMT_SBGGR16_1X16 },
++	{ formats::SGBRG16, MEDIA_BUS_FMT_SGBRG16_1X16 },
++	{ formats::SGRBG16, MEDIA_BUS_FMT_SGRBG16_1X16 },
++	{ formats::SRGGB16, MEDIA_BUS_FMT_SRGGB16_1X16 },
++	{ formats::MJPEG, MEDIA_BUS_FMT_JPEG_1X8 },
++};
++
++} /* namespace */
++
++DcmippPath::DcmippPath(const char *name)
++	: name_(name), enabled_(false), running_(false), input_source_pad_(1), link_(nullptr), isp_decimation_ratio_(1)
++{
++}
++
++DcmippPath::DcmippPath(const char *name, const Span<const PixelFormat> &formats)
++	: name_(name), enabled_(false), running_(false), pathFormats_(formats), input_source_pad_(1), link_(nullptr), isp_decimation_ratio_(1)
++{
++}
++
++int DcmippPath::setEnabled(bool enable)
++{
++	enabled_ = enable;
++
++	if (link_->flags() & MEDIA_LNK_FL_IMMUTABLE)
++		return 0;
++
++	return link_->setEnabled(enable);
++}
++
++bool DcmippPath::init(MediaDevice *media)
++{
++	std::string postproc = std::string("dcmipp_") + name_ + "_postproc";
++	std::string video = std::string("dcmipp_") + name_ + "_capture";
++
++	LOG(DCMIPP, Debug) << "DcmippPath::init " << name_;
++
++	input_ = V4L2Subdevice::fromEntityName(media, "dcmipp_input");
++	if (input_->open() < 0)
++		return false;
++
++	postproc_ = V4L2Subdevice::fromEntityName(media, postproc);
++	if (postproc_->open() < 0)
++		return false;
++
++	video_ = V4L2VideoDevice::fromEntityName(media, video);
++	if (video_->open() < 0)
++		return false;
++
++	if (name_ == std::string("dump")) {
++		link_ = media->link("dcmipp_input", 1, "dcmipp_dump_postproc", 0);
++		if (!link_)
++			return false;
++		input_source_pad_ = 1;
++	} else if (name_ == std::string("main")) {
++		isp_ = V4L2Subdevice::fromEntityName(media, "dcmipp_main_isp");
++		if (isp_->open() < 0)
++			return false;
++		link_ = media->link("dcmipp_input", 2, "dcmipp_main_isp", 0);
++		if (!link_)
++			return false;
++		input_source_pad_ = 2;
++	} else if (name_ == std::string("aux")) {
++		link_ = media->link("dcmipp_main_isp", 1, "dcmipp_aux_postproc", 0);
++		if (!link_)
++			return false;
++		input_source_pad_ = 3;
++	}
++
++	return true;
++}
++
++/*
++ * This function is in charge of
++ * - list up all configuration that could be achieved by a path, taking into
++ *   consideration sensor format, decimate of the ISP block, decimate / downsize
++ *   of the postproc block and color conversion of the main pipe then available
++ *   formats of the pixel cap video device
++ * - set a default configuration depending on the role, that matches the above
++ *   constraint as well
++ * - as far as the Dump pipe is concerned, this is a matter of checking the
++ *   sensor pipe & and bytecap available formats
++ * - we should not care about role at the path level, the decision being done
++ *   at upper level
++ */
++StreamConfiguration
++DcmippPath::generateConfiguration(const CameraSensor *sensor, const Size &maxSize,
++				  PixelFormat rolePixelFormat)
++{
++	const std::vector<unsigned int> &mbusCodes = sensor->mbusCodes();
++	Size resolution = sensor->resolution();
++	Size minSize;
++
++	LOG(DCMIPP, Debug) << "DcmippPath::generateConfiguration " << name_;
++
++	/*
++	 * For Main & Aux pipe postproc can perform decimate-downsize hence 8 * 8 reduction
++	 *
++	 * ISP decimation can also perform a maximum of 8 reduction.  It is also mandatory
++	 * to ensure that RAW frame size does not exceed 2688 width prior demosaicing.
++	 */
++	if (name_ != std::string("dump")) {
++		/* Ensure to not exceed maximum width for demosaicing */
++		while (resolution.width > DCMIPP_RAW_MAX_WIDTH)
++			resolution /= 2;
++
++		minSize = sensor->resolution() / (8 * 8 * 8);
++		minSize.expandTo({ 16, minSize.height });
++	}
++
++	std::map<PixelFormat, std::vector<SizeRange>> formats;
++
++	for (const auto &format : pathFormats_) {
++		const PixelFormatInfo &info = PixelFormatInfo::info(format);
++
++		if (name_ != std::string("dump")) {
++			/* Handling of Pixel pipes (Main / Aux) */
++			std::vector<SizeRange> sizesRange{
++				SizeRange{ minSize, resolution }
++			};
++			formats[format] = std::move(sizesRange);
++			continue;
++		} else if (name_ == std::string("dump") &&
++			   info.colourEncoding == PixelFormatInfo::ColourEncodingRAW) {
++			/* Handling of Byte pipe (Dump) exclusively for RAW formats */
++			uint32_t mbusCode = formatToMediaBus.at(format);
++			if (std::find(mbusCodes.begin(), mbusCodes.end(), mbusCode) ==
++			    mbusCodes.end())
++				/* Skip formats not supported by sensor. */
++				continue;
++			else
++				rolePixelFormat = format;
++
++			/*
++			 * \todo DUMP pipe is also able to perform byte based reduction
++			 * by skipping lines or bytes
++			 * */
++			formats[format] = { resolution, resolution };
++		}
++	}
++
++	StreamConfiguration cfg(formats);
++	cfg.size = maxSize;
++	cfg.pixelFormat = rolePixelFormat;
++	cfg.bufferCount = DCMIPP_V4L2_BUFFER_NB;
++
++	return cfg;
++}
++
++CameraConfiguration::Status DcmippPath::validate(const CameraSensor *sensor,
++						 StreamConfiguration *cfg,
++						 unsigned int *isp_decimation_ratio)
++{
++	bool format_found = false;
++
++	LOG(DCMIPP, Debug) << "DcmippPath::validate " << name_;
++
++	/* Check that configured size can be achieved */
++	Size post_isp_resolution = sensor->resolution();
++
++	/*
++	 * For Main & Aux pipe postproc can perform decimate-downsize hence 8 * 8 reduction
++	 *
++	 * ISP decimation can also perform a maximum of 8 reduction.  It is also mandatory
++	 * to ensure that RAW frame size does not exceed 2688 width prior demosaicing.
++	 */
++	if (name_ != std::string("dump")) {
++		if (!*isp_decimation_ratio) {
++			*isp_decimation_ratio = 1;
++			/* Ensure to not exceed maximum width for demosaicing */
++			while (post_isp_resolution.width > DCMIPP_RAW_MAX_WIDTH ||
++			       post_isp_resolution.width / cfg->size.width > (8 * 8) ||
++			       post_isp_resolution.height / cfg->size.height > (8 * 8)) {
++				*isp_decimation_ratio *= 2;
++				if (*isp_decimation_ratio > 8) {
++					LOG(DCMIPP, Error) << "Necessary decimation factor too big.";
++					return CameraConfiguration::Invalid;
++				}
++				post_isp_resolution /= 2;
++			}
++		} else {
++			post_isp_resolution /= *isp_decimation_ratio;
++			if (post_isp_resolution.width / cfg->size.width > (8 * 8) ||
++			    post_isp_resolution.height / cfg->size.height > (8 * 8)) {
++				LOG(DCMIPP, Error) << "ISP output frame too big to reach final requested size";
++				return CameraConfiguration::Invalid;
++			}
++		}
++	}
++
++	for (const auto &format : pathFormats_) {
++		if (format == cfg->pixelFormat) {
++			format_found = true;
++			break;
++		}
++	}
++
++	if (!format_found)
++		return CameraConfiguration::Invalid;
++
++	V4L2DeviceFormat format;
++	format.fourcc = video_->toV4L2PixelFormat(cfg->pixelFormat);
++	format.size = cfg->size;
++
++	int ret = video_->tryFormat(&format);
++	if (ret)
++		return CameraConfiguration::Invalid;
++
++	cfg->stride = format.planes[0].bpl;
++	cfg->frameSize = format.planes[0].size;
++
++	if (name_ == std::string("main"))
++		isp_decimation_ratio_ = *isp_decimation_ratio;
++
++	return CameraConfiguration::Valid;
++}
++
++int DcmippPath::configure(const StreamConfiguration &config,
++			  const V4L2SubdeviceFormat &inputFormat,
++			  bool gamma_correction)
++{
++	int ret;
++	V4L2SubdeviceFormat subformat = inputFormat;
++
++	LOG(DCMIPP, Debug) << "DcmippPath::configure " << name_;
++
++	ret = input_->setFormat(input_source_pad_, &subformat);
++	if (ret < 0)
++		return ret;
++
++	if (name_ == std::string("dump")) {
++		/* Configuration of the postproc block */
++		ret = postproc_->setFormat(0, &subformat);
++		if (ret)
++			return ret;
++		ret = postproc_->setFormat(1, &subformat);
++		if (ret)
++			return ret;
++		LOG(DCMIPP, Debug)
++			<< "Configured pipe " << name_ << " with format " << subformat;
++	} else if (name_ == std::string("main")) {
++		/* Configuration of the ISP block */
++		ret = isp_->setFormat(0, &subformat);
++		if (ret)
++			return ret;
++
++		subformat.code = MEDIA_BUS_FMT_RGB888_1X24;
++		subformat.size /= isp_decimation_ratio_;
++		Rectangle compose_isp{ 0, 0, subformat.size };
++		ret = isp_->setSelection(0, V4L2_SEL_TGT_COMPOSE, &compose_isp);
++		if (ret)
++			return ret;
++
++		LOG(DCMIPP, Debug)
++			<< "Configured pipe " << name_ << " with ISP output format "
++			<< subformat;
++
++		/* Configuration of the postproc block */
++		ret = postproc_->setFormat(0, &subformat);
++		if (ret)
++			return ret;
++
++		/* This should not happen since config.pixelFormat has already been validated */
++		if (formatToMediaBus.find(config.pixelFormat) == formatToMediaBus.end())
++			return -EINVAL;
++
++		subformat.code = formatToMediaBus.find(config.pixelFormat)->second;
++		ret = postproc_->setFormat(1, &subformat);
++		if (ret)
++			return ret;
++
++		Rectangle compose{ 0, 0, config.size };
++		ret = postproc_->setSelection(0, V4L2_SEL_TGT_COMPOSE, &compose);
++		if (ret)
++			return ret;
++
++		/* Gamma correction configuration */
++		ControlList ctrls;
++		ctrls.set(DCMIPP_V4L2_CID_POSTPROC_GAMMA, (int32_t)(gamma_correction));
++		ret = postproc_->setControls(&ctrls);
++		if (ret)
++			return ret;
++
++		LOG(DCMIPP, Debug)
++			<< "Configured pipe " << name_ << " with format input format "
++			<< inputFormat << " and output format " << subformat;
++	} else if (name_ == std::string("aux")) {
++		subformat.code = MEDIA_BUS_FMT_RGB888_1X24;
++
++		/* Configuration of the postproc block */
++		ret = postproc_->setFormat(0, &subformat);
++		if (ret)
++			return ret;
++		Rectangle compose{ 0, 0, config.size };
++		ret = postproc_->setSelection(0, V4L2_SEL_TGT_COMPOSE, &compose);
++		if (ret)
++			return ret;
++
++		/* This should not happen since config.pixelFormat has already been validated */
++		if (formatToMediaBus.find(config.pixelFormat) == formatToMediaBus.end())
++			return -EINVAL;
++
++		subformat.code = formatToMediaBus.find(config.pixelFormat)->second;
++		ret = postproc_->setFormat(1, &subformat);
++		if (ret)
++			return ret;
++
++		/* Gamma correction configuration */
++		ControlList ctrls;
++		ctrls.set(DCMIPP_V4L2_CID_POSTPROC_GAMMA, (int32_t)(gamma_correction));
++		ret = postproc_->setControls(&ctrls);
++		if (ret)
++			return ret;
++
++		LOG(DCMIPP, Debug)
++			<< "Configured pipe " << name_ << " with output format "
++			<< subformat;
++	}
++
++	const PixelFormatInfo &info = PixelFormatInfo::info(config.pixelFormat);
++	V4L2DeviceFormat outputFormat;
++	outputFormat.fourcc = video_->toV4L2PixelFormat(config.pixelFormat);
++	outputFormat.size = config.size;
++	outputFormat.planesCount = info.numPlanes();
++
++	ret = video_->setFormat(&outputFormat);
++	if (ret)
++		return ret;
++
++	if (outputFormat.size != config.size ||
++	    outputFormat.fourcc != video_->toV4L2PixelFormat(config.pixelFormat)) {
++		LOG(DCMIPP, Error)
++			<< "Unable to configure capture in " << config.toString() << " got instead: " << outputFormat;
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++int DcmippPath::start()
++{
++	int ret;
++
++	LOG(DCMIPP, Debug) << "DcmippPath::start " << name_;
++
++	if (running_)
++		return -EBUSY;
++
++	ret = video_->importBuffers(DCMIPP_V4L2_BUFFER_NB);
++	if (ret)
++		return ret;
++
++	ret = video_->streamOn();
++	if (ret) {
++		LOG(DCMIPP, Error)
++			<< "Failed to start " << name_ << " path";
++
++		video_->releaseBuffers();
++		return ret;
++	}
++
++	running_ = true;
++
++	return 0;
++}
++
++void DcmippPath::stop()
++{
++	LOG(DCMIPP, Debug) << "DcmippPath::stop " << name_;
++
++	if (!running_)
++		return;
++
++	if (video_->streamOff())
++		LOG(DCMIPP, Warning) << "Failed to stop " << name_ << " path";
++
++	video_->releaseBuffers();
++
++	running_ = false;
++}
++
++DcmippDumpPath::DcmippDumpPath()
++	: DcmippPath("dump", pixelformats_dump)
++{
++}
++
++DcmippMainPath::DcmippMainPath()
++	: DcmippPath("main", pixelformats_main)
++{
++}
++
++DcmippAuxPath::DcmippAuxPath()
++	: DcmippPath("aux", pixelformats_aux)
++{
++}
++
++} /* namespace libcamera */
+diff --git a/src/libcamera/pipeline/dcmipp/meson.build b/src/libcamera/pipeline/dcmipp/meson.build
+new file mode 100644
+index 00000000..4f1555d9
+--- /dev/null
++++ b/src/libcamera/pipeline/dcmipp/meson.build
+@@ -0,0 +1,5 @@
++# SPDX-License-Identifier: CC0-1.0
++
++libcamera_sources += files([
++    'dcmipp.cpp', 'dcmipp_path.cpp'
++])
+diff --git a/src/libcamera/v4l2_device.cpp b/src/libcamera/v4l2_device.cpp
+index 4a2048cf..3131243a 100644
+--- a/src/libcamera/v4l2_device.cpp
++++ b/src/libcamera/v4l2_device.cpp
+@@ -334,7 +334,13 @@ int V4L2Device::setControls(ControlList *ctrls)
+ 
+ 		default:
+ 			/* \todo To be changed to support strings. */
+-			v4l2Ctrl.value = value.get<int32_t>();
++			if (value.isArray()) {
++				Span<uint8_t> data = value.data();
++				v4l2Ctrl.p_u32 = reinterpret_cast<uint32_t *>(data.data());
++				v4l2Ctrl.size = data.size();
++			} else {
++				v4l2Ctrl.value = value.get<int32_t>();
++			}
+ 			break;
+ 		}
+ 	}
+@@ -553,9 +559,13 @@ std::optional<ControlInfo> V4L2Device::v4l2ControlInfo(const v4l2_query_ext_ctrl
+ 		return v4l2MenuControlInfo(ctrl);
+ 
+ 	default:
+-		return ControlInfo(static_cast<int32_t>(ctrl.minimum),
+-				   static_cast<int32_t>(ctrl.maximum),
+-				   static_cast<int32_t>(ctrl.default_value));
++		if (ctrl.type >= V4L2_CTRL_COMPOUND_TYPES)
++			/* ControlInfo "None" for such control */
++			return ControlInfo();
++		else
++			return ControlInfo(static_cast<int32_t>(ctrl.minimum),
++					   static_cast<int32_t>(ctrl.maximum),
++					   static_cast<int32_t>(ctrl.default_value));
+ 	}
+ }
+ 
+@@ -627,6 +637,8 @@ void V4L2Device::listControls()
+ 			break;
+ 		/* \todo Support other control types. */
+ 		default:
++			if (ctrl.type >= V4L2_CTRL_COMPOUND_TYPES)
++				break;
+ 			LOG(V4L2, Debug)
+ 				<< "Control " << utils::hex(ctrl.id)
+ 				<< " has unsupported type " << ctrl.type;
+-- 
+2.34.1
+

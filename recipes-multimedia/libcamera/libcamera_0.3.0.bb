@@ -10,10 +10,12 @@ LIC_FILES_CHKSUM = "\
 
 SRC_URI = " \
         git://git.libcamera.org/libcamera/libcamera.git;protocol=https;branch=master \
+        file://0001-media_device-Add-bool-return-type-to-unlock.patch \
+        file://0002-options-Replace-use-of-VLAs-in-C.patch \
+        file://0001-rpi-Use-alloca-instead-of-variable-length-arrays.patch \
 "
 
-# tag v0.2.0
-SRCREV = "89227a428a82e724548399d35c98ea89566f9045"
+SRCREV = "aee16c06913422a0ac84ee3217f87a9795e3c2d9"
 
 PE = "1"
 
@@ -73,4 +75,3 @@ FILES:${PN}-gst = "${libdir}/gstreamer-1.0"
 # libcamera-v4l2 explicitly sets _FILE_OFFSET_BITS=32 to get access to
 # both 32 and 64 bit file APIs.
 GLIBC_64BIT_TIME_FLAGS = ""
-
