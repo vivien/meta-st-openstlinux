@@ -4,6 +4,7 @@ Date: Thu, 30 Nov 2023 10:49:57 -0500
 Subject: [PATCH 66/68] v4l2codecs: h264enc: Rewrite profile/level negotiation
 
 This aligns the SPS/PPS with caps and properly negotiate the level.
+Upstream-Status: Pending
 ---
  sys/v4l2codecs/gstv4l2codech264enc.c | 213 ++++++++++++++++-----------
  1 file changed, 124 insertions(+), 89 deletions(-)

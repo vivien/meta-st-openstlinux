@@ -5,6 +5,7 @@ Subject: [PATCH 53/68] v4l2codecs: format: Prefer mplane variants
 
 If we have the choice, prefer the mplane variant of the pixel formats
 since it allows importing the single plane variant.
+Upstream-Status: Pending
 ---
  sys/v4l2codecs/gstv4l2format.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)

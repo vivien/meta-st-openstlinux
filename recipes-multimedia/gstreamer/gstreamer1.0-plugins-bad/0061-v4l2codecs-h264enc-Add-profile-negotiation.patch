@@ -5,6 +5,7 @@ Subject: [PATCH 61/68] v4l2codecs: h264enc: Add profile negotiation
 
 We currently only support main, constrained-baseline and baseline. Some
 work on the SPS is needed to generate a valid header for high.
+Upstream-Status: Pending
 ---
  sys/v4l2codecs/gstv4l2codech264enc.c | 80 ++++++++++++++++++++++++----
  1 file changed, 69 insertions(+), 11 deletions(-)

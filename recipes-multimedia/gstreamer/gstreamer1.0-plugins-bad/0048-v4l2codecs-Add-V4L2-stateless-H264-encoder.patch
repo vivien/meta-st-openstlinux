@@ -4,6 +4,7 @@ Date: Mon, 20 Feb 2023 23:30:28 +0100
 Subject: [PATCH 48/68] v4l2codecs: Add V4L2 stateless H264 encoder
 
 Using v4l2 request to set driver configuration by using H264 stateless controls.
+Upstream-Status: Pending
 ---
  sys/v4l2codecs/gstv4l2codech264enc.c | 1114 ++++++++++++++++++++++++++
  sys/v4l2codecs/gstv4l2codech264enc.h |   54 ++

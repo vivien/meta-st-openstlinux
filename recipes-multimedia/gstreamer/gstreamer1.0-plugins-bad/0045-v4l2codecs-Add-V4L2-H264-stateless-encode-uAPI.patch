@@ -3,6 +3,7 @@ From: Michael Grzeschik <m.grzeschik@pengutronix.de>
 Date: Tue, 21 Feb 2023 01:57:50 +0100
 Subject: [PATCH 45/68] v4l2codecs: Add V4L2 H264 stateless encode uAPI
 
+Upstream-Status: Pending
 ---
  sys/v4l2codecs/linux/v4l2-controls.h | 85 ++++++++++++++++++++++++++++
  sys/v4l2codecs/linux/videodev2.h     |  3 +

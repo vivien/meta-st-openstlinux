@@ -5,6 +5,7 @@ Subject: [PATCH 65/68] codecs: h264encoder: Use the PID base rate controller
 
 This port the h264encoder to use the generic rate controller and adapt
 the v4l2codecs accordingly.
+Upstream-Status: Pending
 ---
  gst-libs/gst/codecs/gsth264encoder.c | 256 +++++++++++++--------------
  gst-libs/gst/codecs/gsth264frame.h   |   2 +-

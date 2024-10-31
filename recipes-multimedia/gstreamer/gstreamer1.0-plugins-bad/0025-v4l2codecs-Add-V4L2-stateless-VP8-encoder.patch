@@ -5,6 +5,7 @@ Subject: [PATCH 4/5] v4l2codecs: Add V4L2 stateless VP8 encoder
 
 Add element for V4L2 stateless VP8 encoder.
 Using v4l2 request to set driver configuration by using VP8 stateless controls.
+Upstream-Status: Pending
 ---
  sys/v4l2codecs/gstv4l2codecvp8enc.c | 716 ++++++++++++++++++++++++++++
  sys/v4l2codecs/gstv4l2codecvp8enc.h |  54 +++

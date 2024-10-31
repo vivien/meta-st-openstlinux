@@ -8,6 +8,7 @@ right before setting sink format.
 Fixes issues when encoding from YUY2 and I420 formats.
 
 Signed-off-by: Hugues Fruchet <hugues.fruchet@foss.st.com>
+Upstream-Status: Pending
 ---
  sys/v4l2codecs/gstv4l2codecvp8enc.c | 16 ++++++++--------
  1 file changed, 8 insertions(+), 8 deletions(-)

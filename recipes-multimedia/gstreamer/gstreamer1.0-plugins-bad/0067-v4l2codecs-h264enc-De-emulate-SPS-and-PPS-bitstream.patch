@@ -7,6 +7,7 @@ The bit writer does not do de-emulation since its only purpose is to
 serve bits to VA for which drivers are mandated to take care of that.
 Implement minimal de-emulation method using memmove in a post-processing
 fashion.
+Upstream-Status: Pending
 ---
  sys/v4l2codecs/gstv4l2codech264enc.c | 37 ++++++++++++++++++++++++++++
  1 file changed, 37 insertions(+)

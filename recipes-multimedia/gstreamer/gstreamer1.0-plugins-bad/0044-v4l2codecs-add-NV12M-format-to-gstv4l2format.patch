@@ -3,6 +3,7 @@ From: Michael Grzeschik <m.grzeschik@pengutronix.de>
 Date: Thu, 2 Mar 2023 09:18:49 +0100
 Subject: [PATCH 44/68] v4l2codecs: add NV12M format to gstv4l2format
 
+Upstream-Status: Pending
 ---
  sys/v4l2codecs/gstv4l2format.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)

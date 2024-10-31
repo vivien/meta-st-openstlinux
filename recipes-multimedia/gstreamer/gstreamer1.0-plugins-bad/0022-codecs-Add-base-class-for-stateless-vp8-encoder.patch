@@ -4,6 +4,7 @@ Date: Mon, 16 Jan 2023 17:34:10 +0100
 Subject: [PATCH 1/5] codecs: Add base class for stateless vp8 encoder
 
 Add stateless vp8 encoder base class and vp8 frame structure.
+Upstream-Status: Pending
 ---
  gst-libs/gst/codecs/gstvp8encoder.c | 351 ++++++++++++++++++++++++++++
  gst-libs/gst/codecs/gstvp8encoder.h |  81 +++++++

@@ -4,6 +4,7 @@ Date: Wed, 15 Nov 2023 19:13:55 -0500
 Subject: [PATCH 62/68] codecs: h264encoder: Fix H.264 QP max value
 
 should be 51 as per spec.
+Upstream-Status: Pending
 ---
  gst-libs/gst/codecs/gsth264encoder.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)

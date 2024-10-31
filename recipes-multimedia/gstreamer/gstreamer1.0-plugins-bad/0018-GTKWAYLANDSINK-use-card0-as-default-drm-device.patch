@@ -3,6 +3,7 @@ From: Christophe Priouzeau <christophe.priouzeau@foss.st.com>
 Date: Wed, 29 Mar 2023 18:28:39 +0200
 Subject: [PATCH] GTKWAYLANDSINK: use card0 as default drm-device
 
+Upstream-Status: Pending
 ---
  ext/gtk/gstgtkwaylandsink.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)

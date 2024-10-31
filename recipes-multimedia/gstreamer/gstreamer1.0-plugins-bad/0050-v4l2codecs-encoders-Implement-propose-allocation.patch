@@ -6,6 +6,7 @@ Subject: [PATCH 50/68] v4l2codecs: encoders: Implement propose allocation
 For now, do not offer any pool since our buffer pool implementation is
 not complete. But at least advertise GstVideoMeta support in order to
 avoid upstream element having to normalize the strides.
+Upstream-Status: Pending
 ---
  sys/v4l2codecs/gstv4l2codech264enc.c | 15 +++++++++++++++
  sys/v4l2codecs/gstv4l2codecvp8enc.c  | 15 +++++++++++++++

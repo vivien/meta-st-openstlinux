@@ -4,6 +4,7 @@ Date: Wed, 29 Mar 2023 13:14:01 +0200
 Subject: [PATCH 15/17] waylandsink: Uprank to secondary
 
 Signed-off-by: Christophe Priouzeau <christophe.priouzeau@foss.st.com>
+Upstream-Status: Pending
 ---
  ext/wayland/gstwaylandsink.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)

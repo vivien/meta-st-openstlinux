@@ -7,6 +7,7 @@ Subject: [PATCH 57/68] v4l2codecs: h264enc: Cleanup caps, colorimetry,
 This is an overall fix of how colorimetry, framerate and caps are
 handled, with additionall correction regarding GStreamer coding
 standard.
+Upstream-Status: Pending
 ---
  sys/v4l2codecs/gstv4l2codech264enc.c | 203 +++++++++++----------------
  1 file changed, 84 insertions(+), 119 deletions(-)

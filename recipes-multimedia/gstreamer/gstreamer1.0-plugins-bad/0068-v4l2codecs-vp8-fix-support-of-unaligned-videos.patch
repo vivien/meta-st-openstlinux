@@ -5,6 +5,7 @@ Subject: [PATCH 68/68] v4l2codecs: vp8: fix support of unaligned videos
 
 Fix gst_v4l2_codec_vp8_enc_copy_input_buffer() to support copy of
 unaligned video.
+Upstream-Status: Pending
 ---
  sys/v4l2codecs/gstv4l2codecvp8enc.c | 8 ++++----
  1 file changed, 4 insertions(+), 4 deletions(-)

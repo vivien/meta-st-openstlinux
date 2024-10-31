@@ -5,6 +5,7 @@ Subject: [PATCH 58/68] v4l2codecs: h264enc: add CABAC enable/disable control
 
 Add option to enable/disable CABAC. It will change the encoder
 parameters and PPS related flag.
+Upstream-Status: Pending
 ---
  gst-libs/gst/codecs/gsth264encoder.c | 47 ++++++++++++++++++++++++++++
  sys/v4l2codecs/gstv4l2codech264enc.c | 14 ++++++++-

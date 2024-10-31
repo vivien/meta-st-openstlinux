@@ -11,6 +11,7 @@ This fixes a DMAbuf memory leakage identfied with command:
 watch "cat /sys/kernel/debug/dma_buf/bufinfo | grep attached "
 
 Signed-off-by: Hugues Fruchet <hugues.fruchet@foss.st.com>
+Upstream-Status: Submitted
 ---
  ext/gtk/gstgtkwaylandsink.c  | 6 +++++-
  ext/wayland/gstwaylandsink.c | 6 +++++-

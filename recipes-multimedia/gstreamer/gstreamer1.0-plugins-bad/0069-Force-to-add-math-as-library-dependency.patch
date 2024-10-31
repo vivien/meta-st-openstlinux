@@ -4,6 +4,7 @@ Date: Mon, 18 Dec 2023 17:42:00 +0100
 Subject: [PATCH] Force to add math as library dependency
 
 Signed-off-by: Christophe Priouzeau <christophe.priouzeau@foss.st.com>
+Upstream-Status: Pending
 ---
  gst-libs/gst/codecs/meson.build | 4 +++-
  1 file changed, 3 insertions(+), 1 deletion(-)

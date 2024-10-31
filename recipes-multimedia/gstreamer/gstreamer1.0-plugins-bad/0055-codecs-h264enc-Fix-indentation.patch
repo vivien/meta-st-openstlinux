@@ -3,6 +3,7 @@ From: Nicolas Dufresne <nicolas.dufresne@collabora.com>
 Date: Wed, 15 Nov 2023 11:30:58 -0500
 Subject: [PATCH 55/68] codecs: h264enc: Fix indentation
 
+Upstream-Status: Pending
 ---
  gst-libs/gst/codecs/gsth264encoder.c | 3 ++-
  1 file changed, 2 insertions(+), 1 deletion(-)

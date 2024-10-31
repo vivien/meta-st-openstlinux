@@ -6,6 +6,7 @@ Subject: [PATCH 59/68] v4l2codecs: h264enc: Don't call virtual negotiate()
 
 This is not meant to be used like this, call
 gst_video_encoder_negotiate() instead.
+Upstream-Status: Pending
 ---
  sys/v4l2codecs/gstv4l2codech264enc.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)

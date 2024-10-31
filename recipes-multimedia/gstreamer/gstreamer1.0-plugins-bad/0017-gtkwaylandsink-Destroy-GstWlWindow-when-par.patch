@@ -5,6 +5,7 @@ Subject: [PATCH 17/17] sts/3801>gtkwaylandsink: Destroy GstWlWindow when
  parent GtkWindow is destroyed
 
 Part-of: <https://gitlab.freedesktop.org/gstreamer/gstreamer/-/merge_requests/4197>
+Upstream-Status: Backport
 ---
  ext/gtk/gstgtkwaylandsink.c | 3 +++
  1 file changed, 3 insertions(+)

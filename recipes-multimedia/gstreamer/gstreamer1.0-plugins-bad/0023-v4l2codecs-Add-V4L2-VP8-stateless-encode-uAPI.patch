@@ -5,6 +5,7 @@ Subject: [PATCH 2/5] v4l2codecs: Add V4L2 VP8 stateless encode uAPI
 
 Udpate v4l2 header files with the definitions and structures
 used for stateless VP8 encode.
+Upstream-Status: Pending
 ---
  sys/v4l2codecs/linux/v4l2-controls.h | 91 ++++++++++++++++++++++++++++
  sys/v4l2codecs/linux/videodev2.h     |  2 +

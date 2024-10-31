@@ -10,6 +10,7 @@ it is useless till buffer alignment is extrapolated later on
 from bytesperline and sizeimage S_FMT values.
 
 Signed-off-by: Hugues Fruchet <hugues.fruchet@foss.st.com>
+Upstream-Status: Pending
 ---
  sys/v4l2codecs/gstv4l2encoder.c | 4 ++++
  1 file changed, 4 insertions(+)

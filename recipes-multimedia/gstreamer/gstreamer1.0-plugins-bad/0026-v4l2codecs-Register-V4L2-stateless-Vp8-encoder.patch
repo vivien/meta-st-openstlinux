@@ -5,6 +5,7 @@ Subject: [PATCH 5/5] v4l2codecs: Register V4L2 stateless Vp8 encoder
 
 If a v4l2 stateless VP8 encoder is detected register the matching
 element.
+Upstream-Status: Pending
 ---
  sys/v4l2codecs/plugin.c | 35 +++++++++++++++++++++++++++++++++++
  1 file changed, 35 insertions(+)

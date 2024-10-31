@@ -63,8 +63,18 @@ SRC_URI:append = " \
     file://0067-v4l2codecs-h264enc-De-emulate-SPS-and-PPS-bitstream.patch \
     file://0068-v4l2codecs-vp8-fix-support-of-unaligned-videos.patch \
     file://0069-Force-to-add-math-as-library-dependency.patch \
+    file://0070-v4l2codecs-sync-to-kernel-v6.6-headers.patch \
     file://0070-v4l2codecs-encoder-add-rotation-support.patch \
-    file://0071-v4l2codecs-Avoid-QBUF-DQBUF-struct-timeval-.tv_usec-.patch \
+    file://0071-v4l2codecs-vp8-add-webp-image-support.patch \
+    file://0072-jpegparse-don-t-trigger-message-for-failed-com-marke.patch \
+    file://0073-kmsallocator-fix-stride-with-planar-formats.patch \
+    file://0074-Revert-waylandsink-Fix-rendering-of-unaligned-conten.patch \
+    file://0075-waylandsink-match-drm-kernel-driver-alignment.patch \
+    file://0076-gtkwaylandsink-match-drm-kernel-driver-alignment.patch \
+    file://0077-waylandsink-Add-gst_buffer_pool_config_set_params-to.patch \
+    file://0078-gtkwaylandsink-Add-gst_buffer_pool_config_set_params.patch \
+    file://0079-waylandsink-config-buffer-pool-with-query-size-when-.patch \
+    file://0080-gtkwaylandsink-config-buffer-pool-with-query-size-wh.patch \
 "
 
 PACKAGECONFIG_GL ?= "${@bb.utils.contains('DISTRO_FEATURES', 'opengl', 'gles2 egl', '', d)}"

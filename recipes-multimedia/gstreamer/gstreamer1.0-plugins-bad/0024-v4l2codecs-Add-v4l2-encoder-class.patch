@@ -4,6 +4,7 @@ Date: Mon, 16 Jan 2023 17:36:14 +0100
 Subject: [PATCH 3/5] v4l2codecs: Add v4l2 encoder class
 
 Add v4l2 encoder helpers to be used later by v4l2 encoders.
+Upstream-Status: Pending
 ---
  sys/v4l2codecs/gstv4l2codecallocator.c |  105 +-
  sys/v4l2codecs/gstv4l2codecallocator.h |    7 +-

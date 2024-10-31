@@ -6,6 +6,7 @@ Subject: [PATCH 41/68] h264parser: Define level enum values
 ... and stop duplicating it
 
 Part-of: <https://gitlab.freedesktop.org/gstreamer/gstreamer/-/merge_requests/4595>
+Upstream-Status: Backport
 ---
  gst-libs/gst/codecparsers/gsth264parser.h | 31 +++++++++++++++++++++++
  gst-libs/gst/codecs/gsth264decoder.c      | 30 +++-------------------

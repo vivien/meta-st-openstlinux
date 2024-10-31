@@ -19,6 +19,7 @@ due to the fact that downstream elements could rewrite in a frame
 being currently rendered by display subsystem...
 
 Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
+Upstream-Status: Pending
 ---
  ext/gtk/gstgtkwaylandsink.c | 19 +++++++++++++++++++
  1 file changed, 19 insertions(+)

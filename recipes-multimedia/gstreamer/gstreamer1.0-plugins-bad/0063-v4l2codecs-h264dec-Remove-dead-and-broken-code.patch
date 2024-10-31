@@ -5,6 +5,7 @@ Subject: [PATCH 63/68] v4l2codecs: h264dec: Remove dead and broken code
 
 Its not possible with the current uAPI to ask the driver for the QP
 range.
+Upstream-Status: Pending
 ---
  sys/v4l2codecs/gstv4l2codech264enc.c | 40 +++++-----------------------
  sys/v4l2codecs/gstv4l2encoder.c      | 25 -----------------

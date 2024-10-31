@@ -9,6 +9,7 @@ Add support of encoding from RGB in 16 bits and 32 bits formats:
 - RGBx
 - xBGR
 - xRGB
+Upstream-Status: Pending
 ---
  sys/v4l2codecs/gstv4l2format.c | 7 +++++++
  sys/v4l2codecs/gstv4l2format.h | 2 +-

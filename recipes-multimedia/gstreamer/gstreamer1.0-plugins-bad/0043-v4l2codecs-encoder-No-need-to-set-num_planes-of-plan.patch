@@ -5,6 +5,7 @@ Subject: [PATCH 43/68] v4l2codecs: encoder: No need to set num_planes of plane
  size
 
 This is going to be filled by the driver.
+Upstream-Status: Pending
 ---
  sys/v4l2codecs/gstv4l2encoder.c | 5 ++---
  1 file changed, 2 insertions(+), 3 deletions(-)

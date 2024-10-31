@@ -9,6 +9,7 @@ on libdrm and will be stubbed if the dependency is missing. This is derived
 from kmssink dumb allocator.
 
 Part-of: <https://gitlab.freedesktop.org/gstreamer/gstreamer/-/merge_requests/3801>
+Upstream-Status: Backport
 ---
  gst-libs/gst/allocators/allocators.h |   1 +
  gst-libs/gst/allocators/gstdrmdumb.c | 755 +++++++++++++++++++++++++++

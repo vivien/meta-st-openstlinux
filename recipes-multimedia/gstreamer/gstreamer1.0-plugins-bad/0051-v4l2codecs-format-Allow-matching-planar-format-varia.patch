@@ -7,6 +7,7 @@ Subject: [PATCH 51/68] v4l2codecs: format: Allow matching planar format
 This is to allow matching formats that simply have different numbrer of
 planes like NV12 and NV12M. This avoids the spurious S_FMT when this is
 the only difference reported by the driver.
+Upstream-Status: Pending
 ---
  sys/v4l2codecs/gstv4l2encoder.c |  2 +-
  sys/v4l2codecs/gstv4l2format.c  | 20 ++++++++++++++++++++

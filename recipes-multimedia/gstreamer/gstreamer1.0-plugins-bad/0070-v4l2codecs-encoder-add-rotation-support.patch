@@ -6,6 +6,7 @@ Subject: [PATCH] v4l2codecs: encoder: add rotation support
 Add rotation support based on V4L2_CID_ROTATE control.
 90 and 270 degrees rotation requires swap of src width & height
 which must be take into account when allocating src pool.
+Upstream-Status: Pending
 ---
  sys/v4l2codecs/gstv4l2codech264enc.c | 15 ++++++----
  sys/v4l2codecs/gstv4l2codecvp8enc.c  | 15 ++++++----

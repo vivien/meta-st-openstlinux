@@ -21,6 +21,7 @@ and resetting redraw_callback flag when going from PLAYING to PAUSED and
 PAUSED to PLAYING.
 
 Signed-off-by: Hugues Fruchet <hugues.fruchet@foss.st.com>
+Upstream-Status: Pending
 ---
  ext/gtk/gstgtkwaylandsink.c | 14 +++++++++++++-
  1 file changed, 13 insertions(+), 1 deletion(-)

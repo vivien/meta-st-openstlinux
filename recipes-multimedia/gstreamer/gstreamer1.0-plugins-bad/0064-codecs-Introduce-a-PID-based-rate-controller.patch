@@ -6,6 +6,7 @@ Subject: [PATCH 64/68] codecs: Introduce a PID based rate controller
 This is a simplistic rate controller using a PID and some boundaries.
 This has only been tested for H.264 for now and may need some more work
 to support various quantizer scale.
+Upstream-Status: Pending
 ---
  gst-libs/gst/codecs/gstratecontroller.c | 241 ++++++++++++++++++++++++
  gst-libs/gst/codecs/gstratecontroller.h |  70 +++++++

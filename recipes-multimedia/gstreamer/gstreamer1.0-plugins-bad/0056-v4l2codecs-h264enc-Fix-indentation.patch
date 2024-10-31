@@ -3,6 +3,7 @@ From: Nicolas Dufresne <nicolas.dufresne@collabora.com>
 Date: Wed, 15 Nov 2023 11:31:14 -0500
 Subject: [PATCH 56/68] v4l2codecs: h264enc: Fix indentation
 
+Upstream-Status: Pending
 ---
  sys/v4l2codecs/gstv4l2codech264enc.c | 157 ++++++++++++---------------
  1 file changed, 69 insertions(+), 88 deletions(-)

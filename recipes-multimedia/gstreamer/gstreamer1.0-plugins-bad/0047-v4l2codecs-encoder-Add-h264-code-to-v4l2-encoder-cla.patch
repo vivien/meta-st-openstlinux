@@ -4,6 +4,7 @@ Date: Tue, 21 Feb 2023 02:10:52 +0100
 Subject: [PATCH 47/68] v4l2codecs: encoder: Add h264 code to v4l2 encoder
  class
 
+Upstream-Status: Pending
 ---
  sys/v4l2codecs/gstv4l2encoder.c | 25 +++++++++++++++++++++++++
  sys/v4l2codecs/gstv4l2encoder.h |  2 ++

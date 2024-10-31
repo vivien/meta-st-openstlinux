@@ -6,6 +6,7 @@ Subject: [PATCH 4/4] v4l2codecs: add colorimetry support at sink pad
 Forward sink pad colorimetry informations to V4L2.
 This is needed to precisely configure the matrix
 used by encoder for RGB to YUV conversion.
+Upstream-Status: Pending
 ---
  sys/v4l2codecs/gstv4l2encoder.c | 152 ++++++++++++++++++++++++++++++++
  1 file changed, 152 insertions(+)

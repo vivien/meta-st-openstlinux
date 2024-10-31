@@ -4,6 +4,7 @@ Date: Tue, 21 Nov 2023 10:51:47 +0100
 Subject: [PATCH 40/68] Revert "v4l2codecs: fix support of unaligned videos"
 
 This reverts commit cfd4935254b0d438ea60d350c0c3521b435aee84.
+Upstream-Status: Pending
 ---
  sys/v4l2codecs/gstv4l2encoder.c | 4 ----
  1 file changed, 4 deletions(-)

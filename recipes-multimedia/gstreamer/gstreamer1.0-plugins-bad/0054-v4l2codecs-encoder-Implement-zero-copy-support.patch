@@ -8,6 +8,8 @@ V4L2_MEMORY_DMABUF. To alllow fallback, we allocated 4 frame using
 V4L2_MEMORY_MMAP at setup time and detach the dmabuf from the driver. If
 upstream provides dmabuf, we try importating that, and if that fails, we
 make a copy and continue.
+
+Upstream-Status: Pending
 ---
  sys/v4l2codecs/gstv4l2codecallocator.c |  14 +-
  sys/v4l2codecs/gstv4l2codech264enc.c   |  35 +++--

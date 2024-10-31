@@ -4,6 +4,7 @@ Date: Mon, 20 Feb 2023 23:39:33 +0100
 Subject: [PATCH 46/68] codecs: Add base class for stateless h264 encoder
 
 Add stateless h264 encoder base class and h264 frame structure.
+Upstream-Status: Pending
 ---
  gst-libs/gst/codecs/gsth264encoder.c | 352 +++++++++++++++++++++++++++
  gst-libs/gst/codecs/gsth264encoder.h |  81 ++++++

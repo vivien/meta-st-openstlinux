@@ -6,6 +6,7 @@ Subject: [PATCH 42/68] codecparsers: keep naming consistency in GST_H264_LEVEL
 GST_H264_LEVEL_2 should be used instead of GST_H264_LEVEL_2_0
 
 Part-of: <https://gitlab.freedesktop.org/gstreamer/gstreamer/-/merge_requests/4737>
+Upstream-Status: Backport
 ---
  gst-libs/gst/codecparsers/gsth264parser.h | 2 +-
  gst-libs/gst/codecs/gsth264decoder.c      | 2 +-
