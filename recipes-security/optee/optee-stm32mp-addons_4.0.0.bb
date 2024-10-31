@@ -4,11 +4,11 @@ LICENSE = "BSD-3-Clause"
 LIC_FILES_CHKSUM = "file://${COREBASE}/meta/files/common-licenses/BSD-3-Clause;md5=550794465ba0ec5312d6919e203a55f9"
 
 SRC_URI = "git://github.com/STMicroelectronics/optee-stm32mp-addons;protocol=https;branch=main"
-SRCREV = "3c3cb0ed91055d3ea23864264fa71bcc6151af56"
+SRCREV = "d6521c7d02c43068c524bc66add382d2461e8047"
 
-PV = "3.16.0.${SRCPV}"
+PV = "4.0.0.${SRCPV}"
 
-DEPENDS = "optee-client virtual/optee-os python3-pycryptodomex-native"
+DEPENDS = "optee-client virtual-optee-os python3-pycryptodomex-native"
 DEPENDS += "python3-cryptography-native"
 DEPENDS += "openssl"
 
