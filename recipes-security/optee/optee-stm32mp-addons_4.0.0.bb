@@ -6,7 +6,7 @@ LIC_FILES_CHKSUM = "file://${COREBASE}/meta/files/common-licenses/BSD-3-Clause;m
 SRC_URI = "git://github.com/STMicroelectronics/optee-stm32mp-addons;protocol=https;branch=main"
 SRCREV = "d6521c7d02c43068c524bc66add382d2461e8047"
 
-PV = "4.0.0.${SRCPV}"
+PV = "4.0.0.${@bb.utils.contains('MACHINE_FEATURES', 'm33td', 'nocalibration', 'calibration', d)}-${SRCPV}"
 
 DEPENDS = "optee-client virtual-optee-os python3-pycryptodomex-native"
 DEPENDS += "python3-cryptography-native"
@@ -52,6 +52,6 @@ do_install() {
 }
 
 # for Feature calibration
-SYSTEMD_SERVICE:${PN} = "stm32mp-calibration.service stm32mp-calibration.timer"
+SYSTEMD_SERVICE:${PN} = "${@bb.utils.contains('MACHINE_FEATURES', 'm33td', '', 'stm32mp-calibration.service stm32mp-calibration.timer', d)}"
 
 FILES:${PN} += "${systemd_system_unitdir} ${nonarch_base_libdir}"
